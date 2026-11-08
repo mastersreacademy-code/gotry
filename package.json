@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "test": "node --test tests/*.test.js",
-    "check": "node --check src/index.js && node --check src/page.js && node --check src/auth-page.js && node --check src/admin-page.js && node --check src/api.js && node --check src/wizard.js && node --check src/wizard-page.js && npm test",
+    "check": "node --check src/index.js && node --check src/page.js && node --check src/activities-page.js && node --check src/auth-page.js && node --check src/admin-page.js && node --check src/api.js && node --check src/wizard.js && node --check src/wizard-page.js && npm test",
     "deploy": "wrangler deploy",
     "e2e": "playwright test"
   },
