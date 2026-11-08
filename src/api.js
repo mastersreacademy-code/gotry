@@ -111,22 +111,16 @@ export async function handleApi(req,env){
    if(Number(slots.n)>0)return bad('Select a trial session',422);
   }
   if(!Number.isInteger(capacity)||capacity<1)return bad('Activity capacity is invalid',422);
-  const deadline=session?session.starts_at.slice(0,10):(details.deadline||details.trialDate);
+  const deadline=details.deadline|| (session?session.starts_at.slice(0,10):details.trialDate);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(deadline)||deadline<utcToSydney(new Date().toISOString()).slice(0,10))return bad('Registration deadline has passed',409);
   if(childAge<Number(details.minAge)||childAge>Number(details.maxAge))return bad('Age is outside the activity range',422);
   const existing=await db.prepare('SELECT id,status,session_id FROM interests WHERE activity_id=? AND parent_id=? AND child_name=? AND session_id IS ?').bind(activityId,user.id,childName,sessionId||null).first();
   
   if(existing){if(existing.status==='interested')return bad('Interest already registered',409);const result=await db.prepare("UPDATE interests SET status='interested',child_age=?,session_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations') AND (?='' OR EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND status='open' AND starts_at_utc>?)) AND (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)) < ?").bind(childAge,sessionId||null,existing.id,activityId,sessionId,sessionId,new Date().toISOString(),activityId,sessionId,sessionId,capacity).run();if(result.meta?.changes!==1)return bad('Trial is full',409);return json({id:existing.id,status:'interested'});}
   const id=crypto.randomUUID();
-  const result=await db.prepare("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age,session_id) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)) < ? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations') AND (?='' OR EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND status='open' AND (starts_at_utc IS NULL OR starts_at_utc>?)))").bind(id,activityId,user.id,childName,childAge,sessionId||null,activityId,sessionId,sessionId,capacity,activityId,sessionId,sessionId,new Date().toISOString()).run();
+  const result=await db.prepare("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age,session_id) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)) < ? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations') AND (?='' OR EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND status='open' AND starts_at_utc>?))").bind(id,activityId,user.id,childName,childAge,sessionId||null,activityId,sessionId,sessionId,capacity,activityId,sessionId,sessionId,new Date().toISOString()).run();
   if(result.meta?.changes!==1)return bad('Trial is full or unavailable',409);
-  await notify(db,user.id,activityId,'interest_registered','Interest registered','Your interest was saved. This is not a confirmed booking.');
-  const total=await db.prepare("SELECT COUNT(*) AS n FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)").bind(activityId,sessionId,sessionId).first();
-  const min=session?Number((await db.prepare('SELECT min_participants FROM trial_sessions WHERE id=?').bind(sessionId).first()).min_participants):(details.trialType==='group'?Number(details.minParticipants):1);
-  if(Number(total?.n)===min){
-   const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(activityId).first();
-   if(owner)await notify(db,owner.provider_id,activityId,'minimum_reached','Minimum interest reached','The trial reached its minimum number of interested children. Admin confirmation is still required.');
-  }
+  // Interest triggers enqueue parent/provider notifications atomically with this insert.
   return json({id,status:'interested'},201);
  }
  const transfer=path.match(/^\/api\/parent\/interests\/([a-f0-9-]{36})\/transfer$/);

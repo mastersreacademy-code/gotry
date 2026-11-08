@@ -121,3 +121,21 @@ npx wrangler d1 migrations apply gotry-ci --local --config wrangler.ci.jsonc
 The concurrent SQLite WAL test uses six simultaneous connections to compete for two seats and asserts exactly two accepted writes, then exercises transfer and notification outbox. This is an **additional regression test**, not proof of Wrangler D1 production concurrency. The API now disallows transferring or withdrawing an interest from a confirmed/cancelled session, including a second status check within the SQL UPDATE. The Parent Dashboard hides the actions for locked sessions. Legacy unassigned interests cannot be transferred until migrated explicitly.
 
 Protect real children: only use pseudonymous child labels in testing; do not enter actual child names, birthdates, or contact details. Full end-to-end provider/admin/parent browser and real Wrangler D1 tests still require a local checkout and are not automatically executed by this PR.
+
+## Local Wrangler D1 and Playwright gate (PR #16)
+
+From a full checkout on a machine with Node/npm and network access to install dependencies:
+
+```sh
+npm ci
+bash tests/wrangler-local-d1-smoke.sh
+npm run check
+python3 tests/session_concurrency_sqlite.py
+npm run e2e
+```
+
+The D1 script applies migrations **locally only**, checks migration 0009 and verifies the six outbox/capacity triggers. The Playwright suite includes anonymous API isolation and responsive noindex checks on desktop/mobile; it starts a local Wrangler Worker using `wrangler.ci.jsonc`. Run the D1 script **before** Playwright, since the Worker requires the tables.
+
+Registration now respects the provider's configured deadline even when a later session exists. The interest-insert path no longer creates a duplicate direct notification after the outbox trigger; the provider sees atomic interest notifications in the inbox. The prior post-insert minimum-reached notification has been removed because it could fail after the registration had already committed; minimum counts remain available to Provider and Admin dashboards.
+
+**Verification boundary:** This PR does not claim full Wrangler/Playwright execution in the assistant environment. GitHub checkout DNS and npm registry access are unavailable there. Review the commands' actual output on a local checkout before production; never run `wrangler deploy` as part of this gate.
