@@ -18,6 +18,10 @@ export async function handleApi(req,env){
  if(method!=='GET'&&!sameOrigin(req))return bad('Origin verification failed',403);
  if(method!=='GET'&&!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))return bad('JSON required',415);
  try{
+ if(path==='/api/activities'&&method==='GET'){
+  const rows=await db.prepare("SELECT id,title,data_json FROM activities WHERE status='pending_registrations' ORDER BY created_at DESC LIMIT 100").all();
+  return json({activities:(rows.results||[]).map(a=>{const data=JSON.parse(a.data_json);return {id:a.id,title:a.title,category:data.category,description:data.description,location:data.location,minAge:data.minAge,maxAge:data.maxAge};})});
+ }
  if(path==='/api/auth/register'&&method==='POST'){
   const body=await readBody(req),email=String(body.email||'').trim().toLowerCase(),password=String(body.password||''),role=body.role;
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254||password.length<12||password.length>128||!['parent','provider'].includes(role))return bad('Valid email, role and password of 12-128 characters required');
