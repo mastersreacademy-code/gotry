@@ -16,10 +16,13 @@ db.execute("INSERT INTO activities(id,provider_id,title,status,data_json) VALUES
 db.execute("INSERT INTO trial_sessions(id,activity_id,starts_at,ends_at,venue,min_participants,max_participants,starts_at_utc,ends_at_utc) VALUES('slot','activity','2099-01-01T10:00','2099-01-01T11:00','Sydney',1,2,'2098-12-31T23:00:00.000Z','2099-01-01T00:00:00.000Z')")
 db.execute("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age,session_id) VALUES('interest','activity','parent','Child',8,'slot')")
 db.commit()
+# Migration 0008 queues two registration notices before session confirmation.
+baseline=db.execute("SELECT COUNT(*) FROM session_notification_outbox").fetchone()[0]
+assert baseline==2, f"Expected parent/provider registration notices, got {baseline}"
 db.execute("UPDATE trial_sessions SET status='confirmed' WHERE id='slot'")
-assert db.execute("SELECT COUNT(*) FROM session_notification_outbox").fetchone()[0]==2
+assert db.execute("SELECT COUNT(*) FROM session_notification_outbox").fetchone()[0]==baseline+2
 db.execute("UPDATE trial_sessions SET status='confirmed' WHERE id='slot'")
-assert db.execute("SELECT COUNT(*) FROM session_notification_outbox").fetchone()[0]==2
+assert db.execute("SELECT COUNT(*) FROM session_notification_outbox").fetchone()[0]==baseline+2
 deliver="""INSERT OR IGNORE INTO notifications(id,user_id,activity_id,kind,title,message,created_at)
 SELECT substr(id,1,8)||'-'||substr(id,9,4)||'-'||substr(id,13,4)||'-'||substr(id,17,4)||'-'||substr(id,21,12),user_id,activity_id,kind,title,message,created_at
 FROM session_notification_outbox WHERE user_id=? AND delivered_at IS NULL"""
@@ -31,8 +34,13 @@ for user in ("parent","provider"):
     with db:
         db.execute(deliver,(user,))
         db.execute(ack,(user,))
-assert db.execute("SELECT COUNT(*) FROM notifications").fetchone()[0]==2
+assert db.execute("SELECT COUNT(*) FROM notifications").fetchone()[0]==baseline+2
 assert db.execute("SELECT COUNT(*) FROM session_notification_outbox WHERE delivered_at IS NULL").fetchone()[0]==0
+# Outbox and inbox must not leak child names or ages into notification messages.
+for table in ("session_notification_outbox","notifications"):
+    exposed=db.execute("SELECT COUNT(*) FROM "+table+" WHERE instr(message,'Child')>0 OR instr(title,'Child')>0").fetchone()[0]
+    assert exposed==0, f"Child data leaked into {table}"
+
 db.execute("UPDATE trial_sessions SET starts_at='2099-01-02T10:00',venue='New venue' WHERE id='slot'")
 assert db.execute("SELECT COUNT(*) FROM session_notification_outbox WHERE delivered_at IS NULL").fetchone()[0]==2
 db.execute("INSERT INTO users(id,email,password_hash,role) VALUES('other','other@example.test','x','parent')")

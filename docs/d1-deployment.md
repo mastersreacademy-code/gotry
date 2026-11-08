@@ -163,3 +163,21 @@ The registration **INSERT** and withdrawn-interest **restore UPDATE** now enforc
 From a complete checkout, run `python3 tests/session_atomic_state_sqlite.py` to execute the **actual SQL extracted from src/api.js** after applying migrations 0001–0009 in SQLite. The script checks expired deadlines for new/restored interests, successful future registrations, expired Admin confirmation, successful confirmation and notification outbox. Run `npm run check`, `bash tests/wrangler-local-d1-smoke.sh` and `npm run e2e` separately; the SQLite test does not substitute for actual Wrangler D1 or browser tests.
 
 The expanded `tests/session-write-security.test.js` covers anonymous and cross-origin writes across Parent, Provider and Admin session endpoints. It is not a substitute for authenticated cross-role and ownership E2E tests. Avoid using actual children's names or personal information in test fixtures. Do not deploy until the full D1 migration chain and role-based flows have been validated.
+
+## Provider reschedule race and notification privacy regression
+
+The provider's reschedule SQL now checks `starts_at_utc > now` **inside the atomic UPDATE**, in addition to request validation. This blocks a reschedule racing with the original session start. The Provider dashboard disables the Change Schedule action after a session begins.
+
+The migration-0008 outbox regression test previously expected only two notifications after confirmation; it omitted the two new registration notifications. The corrected test expects **two registration + two confirmation** messages, validates repeat delivery is idempotent, confirms a second user cannot see the notifications, and asserts that child names do not appear in outbox or inbox messages.
+
+Run from a full checkout:
+```sh
+python3 tests/outbox_sqlite_smoke.py
+python3 tests/reschedule_atomic_sqlite.py
+python3 tests/session_capacity_sqlite_smoke.py
+python3 tests/session_atomic_state_sqlite.py
+bash tests/wrangler-local-d1-smoke.sh
+npm run check
+npm run e2e
+```
+These commands have not all been executed in the assistant environment. An isolated SQLite reschedule SQL check passed locally (ownership, future session, expired session), but the complete migration chain and Wrangler/Playwright remain unverified without a repository checkout and dependencies. No CI or deployment is triggered by the instructions.
