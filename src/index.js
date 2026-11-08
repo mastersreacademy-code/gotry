@@ -1,8 +1,10 @@
 import { page } from './page.js';
+import { handleApi } from './api.js';
 import { wizardPage } from './wizard-page.js';
 export default {
-  async fetch(request) {
+  async fetch(request, env = {}) {
     const { pathname } = new URL(request.url);
+    if (pathname.startsWith('/api/')) return handleApi(request, env);
     if (pathname === '/health') return Response.json({ app: 'gotry', status: 'ok', version: '0.1.0' }, { headers: { 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' } });
     if ((pathname === '/' || pathname === '/provider/new') && request.method === 'GET') return new Response(pathname === '/' ? page : wizardPage, { headers: {
       'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
