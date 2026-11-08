@@ -30,7 +30,8 @@ export async function handleApi(req,env){
   const activityId=url.searchParams.get('activityId')||'';
   if(!/^[a-f0-9-]{36}$/.test(activityId))return bad('Valid activity ID required');
   const rows=await db.prepare("SELECT s.id,s.starts_at,s.ends_at,s.venue,s.min_participants,s.max_participants,s.status,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.activity_id=? AND a.status='pending_registrations' AND s.status='open' ORDER BY s.starts_at ASC LIMIT 50").bind(activityId).all();
-  return json({sessions:(rows.results||[]).map(s=>({...s,remaining:Math.max(0,s.max_participants-s.interested),minimumReached:s.interested>=s.min_participants}))});
+  const count=await db.prepare('SELECT COUNT(*) AS n FROM trial_sessions WHERE activity_id=?').bind(activityId).first();
+  return json({hasSessions:Number(count.n)>0,sessions:(rows.results||[]).map(s=>({...s,remaining:Math.max(0,s.max_participants-s.interested),minimumReached:s.interested>=s.min_participants}))});
  }
  if(path==='/api/activities'&&method==='GET'){
   const rows=await db.prepare("SELECT a.id,a.title,a.data_json,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.status='pending_registrations' ORDER BY a.created_at DESC LIMIT 100").all();
