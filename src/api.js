@@ -58,11 +58,14 @@ export async function handleApi(req,env){
   const activity=await db.prepare("SELECT data_json FROM activities WHERE id=? AND status='pending_registrations'").bind(activityId).first();
   if(!activity)return bad('Activity is not accepting interest',404);
   const details=JSON.parse(activity.data_json);
+  const capacity=details.trialType==='group'?Number(details.maxParticipants):1;
+  if(!Number.isInteger(capacity)||capacity<1)return bad('Activity capacity is invalid',422);
   if(childAge<Number(details.minAge)||childAge>Number(details.maxAge))return bad('Age is outside the activity range',422);
   const existing=await db.prepare('SELECT id,status FROM interests WHERE activity_id=? AND parent_id=? AND child_name=?').bind(activityId,user.id,childName).first();
-  if(existing){if(existing.status==='interested')return bad('Interest already registered',409);await db.prepare("UPDATE interests SET status='interested',child_age=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(childAge,existing.id).run();return json({id:existing.id,status:'interested'});}
+  if(existing){if(existing.status==='interested')return bad('Interest already registered',409);const result=await db.prepare("UPDATE interests SET status='interested',child_age=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested') < ?").bind(childAge,existing.id,activityId,capacity).run();if(result.meta?.changes!==1)return bad('Trial is full',409);return json({id:existing.id,status:'interested'});}
   const id=crypto.randomUUID();
-  await db.prepare('INSERT INTO interests(id,activity_id,parent_id,child_name,child_age) VALUES(?,?,?,?,?)').bind(id,activityId,user.id,childName,childAge).run();
+  const result=await db.prepare("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested') < ? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations')").bind(id,activityId,user.id,childName,childAge,activityId,capacity,activityId).run();
+  if(result.meta?.changes!==1)return bad('Trial is full or unavailable',409);
   return json({id,status:'interested'},201);
  }
  const withdraw=path.match(/^\/api\/parent\/interests\/([a-f0-9-]{36})\/withdraw$/);
@@ -85,6 +88,14 @@ export async function handleApi(req,env){
   if(user.role!=='provider')return bad('Forbidden',403);
   const rows=await db.prepare("SELECT a.id,a.title,a.status,a.admin_note,a.data_json,a.created_at,a.updated_at,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.provider_id=? ORDER BY a.created_at DESC LIMIT 100").bind(user.id).all();
   return json({activities:(rows.results||[]).map(({data_json,...row})=>({...row,trial:publicTrial(JSON.parse(data_json),Number(row.interest_count))}))});
+ }
+ const cancel=path.match(/^\/api\/provider\/activities\/([a-f0-9-]{36})\/cancel$/);
+ if(cancel&&method==='POST'){
+  if(user.role!=='provider')return bad('Forbidden',403);
+  const result=await db.prepare("UPDATE activities SET status='cancelled_by_provider',updated_at=CURRENT_TIMESTAMP WHERE id=? AND provider_id=? AND status IN ('pending_approval','pending_registrations')").bind(cancel[1],user.id).run();
+  if(result.meta?.changes!==1)return bad('Activity unavailable or cannot be cancelled',409);
+  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,cancel[1],'cancel_by_provider').run();
+  return json({id:cancel[1],status:'cancelled_by_provider'});
  }
  if(path==='/api/admin/activities'&&method==='GET'){
   if(user.role!=='admin')return bad('Forbidden',403);
