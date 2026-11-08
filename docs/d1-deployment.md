@@ -47,3 +47,11 @@ Migration `0004_notifications.sql` adds per-account notifications. New activity 
 5. Parents see the selected session's date and venue. Notifications appear in-app only.
 
 **Current limitations:** one child nickname can have only one active interest per activity, even if that activity has multiple sessions; to switch sessions the parent must withdraw first. Session start/end are local wall-clock strings without a timezone identifier; do not use the schedule for real bookings until timezone handling is added. No automated attendance, emails, payments, or calendar invitations. The local SQL smoke check does not substitute for a full D1/Playwright end-to-end test.
+
+## Sydney timezone, rosters and rescheduling (migration 0006)
+
+Before manual Cloudflare deployment, back up D1 and apply `migrations/0006_sydney_schedule.sql` after 0001–0005. New sessions store both Sydney wall time and UTC instants, with timezone `Australia/Sydney`. DST gap and duplicate-hour times are rejected. Existing sessions have null UTC fields until explicitly rescheduled; review and migrate those records before production use.
+
+Provider Dashboard now supports owner-only rosters and rescheduling of open sessions while the activity awaits approval or registrations. Parents with active interest receive an in-app schedule-change notification. Roster data is not public. No emails or payments are sent. Session cancellation/confirmation remains admin-controlled.
+
+**Testing:** run `npm run check` and local Wrangler D1 integration tests before deployment. The code includes Sydney DST unit tests, but end-to-end D1 and browser tests must be independently verified. Prototype is not ready for real children's personal information.
