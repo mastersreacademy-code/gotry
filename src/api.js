@@ -150,6 +150,31 @@ export async function handleApi(req,env){
   await notify(db,user.id,providerSessions[1],'session_created','Trial session scheduled','A new trial session was added to your pending activity.');
   return json({id,status:'open'},201);
  }
+ const roster=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/roster$/);
+ if(roster&&method==='GET'){
+  if(user.role!=='provider')return bad('Forbidden',403);
+  const owned=await db.prepare('SELECT s.id FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=?').bind(roster[1],user.id).first();
+  if(!owned)return bad('Not found',404);
+  const rows=await db.prepare("SELECT i.id,i.child_name,i.child_age,i.status,i.created_at FROM interests i WHERE i.session_id=? AND i.status='interested' ORDER BY i.created_at ASC LIMIT 100").bind(roster[1]).all();
+  return json({roster:rows.results||[]});
+ }
+ const reschedule=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/reschedule$/);
+ if(reschedule&&method==='POST'){
+  if(user.role!=='provider')return bad('Forbidden',403);
+  const b=await readBody(req),start=String(b.startsAt||''),end=String(b.endsAt||''),venue=String(b.venue||'').trim();
+  let startUtc,endUtc;
+  try{startUtc=sydneyToUtc(start);endUtc=sydneyToUtc(end);}catch(e){return bad(e.message,422);}
+  if(startUtc<=new Date().toISOString()||endUtc<=startUtc||venue.length<2||venue.length>160)return bad('Invalid future Sydney schedule or venue',422);
+  const session=await db.prepare("SELECT s.activity_id,s.starts_at,s.venue,s.status,a.status AS activity_status FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=?").bind(reschedule[1],user.id).first();
+  if(!session)return bad('Not found',404);
+  if(session.status!=='open'||!['pending_approval','pending_registrations'].includes(session.activity_status))return bad('Only open sessions can be rescheduled',409);
+  const changed=await db.prepare("UPDATE trial_sessions SET starts_at=?,ends_at=?,starts_at_utc=?,ends_at_utc=?,venue=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open'").bind(start,end,startUtc,endUtc,venue,reschedule[1]).run();
+  if(changed.meta?.changes!==1)return bad('Session changed',409);
+  const parents=await db.prepare("SELECT DISTINCT parent_id FROM interests WHERE session_id=? AND status='interested'").bind(reschedule[1]).all();
+  for(const p of parents.results||[])await notify(db,p.parent_id,session.activity_id,'session_rescheduled','Trial time changed','New Sydney time: '+start+' at '+venue+'. Please review your trial details.');
+  await notify(db,user.id,session.activity_id,'session_rescheduled','Session updated','Sydney time: '+start+' at '+venue);
+  return json({id:reschedule[1],startsAt:start,endsAt:end,timezone:'Australia/Sydney'});
+ }
  if(path==='/api/provider/activities'&&method==='POST'){
   if(user.role!=='provider')return bad('Forbidden',403);
   const body=await readBody(req),data=safeDraft(body),errors={};
