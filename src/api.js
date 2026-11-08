@@ -45,6 +45,32 @@ export async function handleApi(req,env){
   return json({ok:true},200,{'set-cookie':sessionCookie('',0)});
  }
  if(!user)return bad('Unauthenticated',401);
+ if(path==='/api/parent/interests'&&method==='GET'){
+  if(user.role!=='parent')return bad('Forbidden',403);
+  const rows=await db.prepare("SELECT i.id,i.child_name,i.child_age,i.status,i.created_at,a.title,a.status AS activity_status FROM interests i JOIN activities a ON a.id=i.activity_id WHERE i.parent_id=? ORDER BY i.created_at DESC LIMIT 100").bind(user.id).all();
+  return json({interests:rows.results||[]});
+ }
+ if(path==='/api/parent/interests'&&method==='POST'){
+  if(user.role!=='parent')return bad('Forbidden',403);
+  const body=await readBody(req),activityId=String(body.activityId||''),childName=String(body.childName||'').trim(),childAge=Number(body.childAge);
+  if(!/^[a-f0-9-]{36}$/.test(activityId)||childName.length<1||childName.length>80||!Number.isInteger(childAge)||childAge<1||childAge>18)return bad('Valid activity, child name and age required');
+  const activity=await db.prepare("SELECT data_json FROM activities WHERE id=? AND status='pending_registrations'").bind(activityId).first();
+  if(!activity)return bad('Activity is not accepting interest',404);
+  const details=JSON.parse(activity.data_json);
+  if(childAge<Number(details.minAge)||childAge>Number(details.maxAge))return bad('Age is outside the activity range',422);
+  const existing=await db.prepare('SELECT id,status FROM interests WHERE activity_id=? AND parent_id=? AND child_name=?').bind(activityId,user.id,childName).first();
+  if(existing){if(existing.status==='interested')return bad('Interest already registered',409);await db.prepare("UPDATE interests SET status='interested',child_age=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(childAge,existing.id).run();return json({id:existing.id,status:'interested'});}
+  const id=crypto.randomUUID();
+  await db.prepare('INSERT INTO interests(id,activity_id,parent_id,child_name,child_age) VALUES(?,?,?,?,?)').bind(id,activityId,user.id,childName,childAge).run();
+  return json({id,status:'interested'},201);
+ }
+ const withdraw=path.match(/^\/api\/parent\/interests\/([a-f0-9-]{36})\/withdraw$/);
+ if(withdraw&&method==='POST'){
+  if(user.role!=='parent')return bad('Forbidden',403);
+  const result=await db.prepare("UPDATE interests SET status='withdrawn',updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested'").bind(withdraw[1],user.id).run();
+  if(result.meta?.changes!==1)return bad('Interest not found or already withdrawn',404);
+  return json({id:withdraw[1],status:'withdrawn'});
+ }
  if(path==='/api/provider/activities'&&method==='POST'){
   if(user.role!=='provider')return bad('Forbidden',403);
   const body=await readBody(req),data=safeDraft(body),errors={};
