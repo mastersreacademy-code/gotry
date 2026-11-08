@@ -82,7 +82,7 @@ export async function handleApi(req,env){
  }
  if(path==='/api/provider/activities'&&method==='GET'){
   if(user.role!=='provider')return bad('Forbidden',403);
-  const rows=await db.prepare('SELECT id,title,status,created_at,updated_at FROM activities WHERE provider_id=? ORDER BY created_at DESC LIMIT 100').bind(user.id).all();
+  const rows=await db.prepare('SELECT a.id,a.title,a.status,a.created_at,a.updated_at,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.provider_id=? ORDER BY a.created_at DESC LIMIT 100').bind(user.id).all();
   return json({activities:rows.results});
  }
  if(path==='/api/admin/activities'&&method==='GET'){
