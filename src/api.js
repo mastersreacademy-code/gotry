@@ -172,10 +172,10 @@ export async function handleApi(req,env){
  const roster=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/roster$/);
  if(roster&&method==='GET'){
   if(user.role!=='provider')return bad('Forbidden',403);
-  const owned=await db.prepare('SELECT s.id FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=?').bind(roster[1],user.id).first();
+  const owned=await db.prepare('SELECT s.id,s.status FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=?').bind(roster[1],user.id).first();
   if(!owned)return bad('Not found',404);
-  const rows=await db.prepare("SELECT i.id,i.child_name,i.status,i.created_at FROM interests i WHERE i.session_id=? AND i.status='interested' ORDER BY i.created_at ASC LIMIT 100").bind(roster[1]).all();
-  return json({roster:rows.results||[]});
+  const rows=await db.prepare("SELECT i.id,CASE WHEN ?='confirmed' THEN i.child_name ELSE NULL END AS child_name,i.status,i.created_at FROM interests i WHERE i.session_id=? AND i.status='interested' ORDER BY i.created_at ASC LIMIT 100").bind(owned.status,roster[1]).all();
+  return json({roster:rows.results||[],namesAvailable:owned.status==='confirmed'});
  }
  const cancelSession=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/cancel$/);
  if(cancelSession&&method==='POST'){
