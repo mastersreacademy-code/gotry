@@ -181,3 +181,11 @@ npm run check
 npm run e2e
 ```
 These commands have not all been executed in the assistant environment. An isolated SQLite reschedule SQL check passed locally (ownership, future session, expired session), but the complete migration chain and Wrangler/Playwright remain unverified without a repository checkout and dependencies. No CI or deployment is triggered by the instructions.
+
+## Child data minimization: Provider roster
+
+The Provider session roster now returns **anonymous counts while a session is open or cancelled**. Child names become visible only once Admin has confirmed the session. The endpoint no longer sends unnecessary interest IDs, creation timestamps, or status fields. Provider ownership and authenticated role checks still apply.
+
+Run `python3 tests/provider_roster_privacy_sqlite.py` after checking out the repository. It loads migrations 0001–0009 and executes the production roster SELECT against open, cancelled and confirmed cases. The assistant ran the isolated equivalent SQL using local SQLite, but has **not** run this full migration-based test, Wrangler D1 or Playwright. Keep using synthetic child names in all fixtures.
+
+A session being confirmed is not consent to share contact information; no child email, address or parent contact details are returned by this endpoint. Review the complete consent and safeguarding model before real users.
