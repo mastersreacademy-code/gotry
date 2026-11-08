@@ -13,5 +13,5 @@ test('provider wizard navigates and preserves draft after reload',async({page})=
 });
 test('unauthenticated API is blocked',async({request})=>{
  const response=await request.get('/api/auth/me');
- expect(response.status()).toBe(503); // D1 deliberately unbound in prototype
+ expect(response.status()).toBe(401); // D1 local database is bound in CI
 });
