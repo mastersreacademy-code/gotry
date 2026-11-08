@@ -90,3 +90,11 @@ Remaining work: transactionally link parent interest changes to notifications, c
 The Parent Dashboard offers a **Change session** action. The API verifies parent ownership, target activity, available places, future Sydney time, status, age range and duplicate registration before updating the session ID. Parents can still withdraw one specific registration. SQLite triggers enqueue notifications for registration, restoration, transfer and withdrawal to the parent and provider, transactionally with the interest change. Outbox delivery happens when the recipient opens Notifications.
 
 Run `python3 tests/multi_session_sqlite_smoke.py`, `python3 tests/outbox_sqlite_smoke.py`, `python3 tests/sqlite_d1_smoke.py` and `npm run check` from a checkout. Then run the Wrangler local D1 migration and browser tests before any production deployment. **These test files are not evidence of execution**; their results must be checked in the local environment. Real child data and payments are not production-ready.
+
+## Migration 0009 — capacity enforcement and child-data minimisation
+
+After backing up D1 and testing migration 0008 on a **disposable local database**, apply `migrations/0009_session_capacity_guards.sql`. This adds SQLite triggers that reject inserting, restoring or transferring an active interest into a full, closed, expired or mismatched session. D1 serializes SQLite writes, so the count check and write run within one database operation rather than trusting a previous API read. Legacy interests with no session ID are unaffected.
+
+The API translates capacity/duplicate constraint failures to HTTP 409 rather than returning an opaque server error. Provider rosters no longer return or display children's ages. Child nicknames remain visible to the activity's owner, so real child information still requires a privacy/retention review.
+
+Run `python3 tests/session_capacity_sqlite_smoke.py` and existing SQLite suites; then run the full Wrangler D1 migration chain and browser integration tests on a local checkout. **Do not assume test scripts passed merely because they were committed.** Cloudflare production remains unchanged.
