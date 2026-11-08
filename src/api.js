@@ -181,7 +181,7 @@ export async function handleApi(req,env){
   const session=await db.prepare("SELECT s.activity_id,s.starts_at,s.venue,s.status,a.status AS activity_status FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=?").bind(reschedule[1],user.id).first();
   if(!session)return bad('Not found',404);
   if(session.status!=='open'||!['pending_approval','pending_registrations'].includes(session.activity_status))return bad('Only open sessions can be rescheduled',409);
-  const changed=await db.prepare("UPDATE trial_sessions SET starts_at=?,ends_at=?,starts_at_utc=?,ends_at_utc=?,venue=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open'").bind(start,end,startUtc,endUtc,venue,reschedule[1]).run();
+  const changed=await db.prepare("UPDATE trial_sessions SET starts_at=?,ends_at=?,starts_at_utc=?,ends_at_utc=?,venue=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND provider_id=? AND status IN ('pending_approval','pending_registrations'))").bind(start,end,startUtc,endUtc,venue,reschedule[1],user.id).run();
   if(changed.meta?.changes!==1)return bad('Session changed',409);
   const parents=await db.prepare("SELECT DISTINCT parent_id FROM interests WHERE session_id=? AND status='interested'").bind(reschedule[1]).all();
   for(const p of parents.results||[])await notify(db,p.parent_id,session.activity_id,'session_rescheduled','Trial time changed','New Sydney time: '+start+' at '+venue+'. Please review your trial details.');
