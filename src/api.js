@@ -3,6 +3,7 @@ const encoder=new TextEncoder();
 const json=(data,status=200,extra={})=>Response.json(data,{status,headers:{'cache-control':'no-store','x-robots-tag':'noindex, nofollow',...extra}});
 const bad=(message,status=400)=>json({error:message},status);
 const cookieName='gotry_session';
+function publicTrial(d,count=0){const min=d.trialType==='group'?Number(d.minParticipants):1;const max=d.trialType==='group'?Number(d.maxParticipants):1;return {type:d.trialType,date:d.trialDate,time:d.trialTime||'',minParticipants:min,maxParticipants:max,interestCount:count,remaining:Math.max(0,max-count),minimumReached:count>=min};}
 const hex=buffer=>Array.from(new Uint8Array(buffer),x=>x.toString(16).padStart(2,'0')).join('');
 async function sha256(s){return hex(await crypto.subtle.digest('SHA-256',encoder.encode(s)));}
 async function passwordHash(password,salt=crypto.randomUUID()){const key=await crypto.subtle.importKey('raw',encoder.encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:encoder.encode(salt),iterations:210000,hash:'SHA-256'},key,256);return salt+':'+hex(bits);}
@@ -19,8 +20,8 @@ export async function handleApi(req,env){
  if(method!=='GET'&&!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))return bad('JSON required',415);
  try{
  if(path==='/api/activities'&&method==='GET'){
-  const rows=await db.prepare("SELECT id,title,data_json FROM activities WHERE status='pending_registrations' ORDER BY created_at DESC LIMIT 100").all();
-  return json({activities:(rows.results||[]).map(a=>{const data=JSON.parse(a.data_json);return {id:a.id,title:a.title,category:data.category,description:data.description,location:data.location,minAge:data.minAge,maxAge:data.maxAge};})});
+  const rows=await db.prepare("SELECT a.id,a.title,a.data_json,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.status='pending_registrations' ORDER BY a.created_at DESC LIMIT 100").all();
+  return json({activities:(rows.results||[]).map(a=>{const data=JSON.parse(a.data_json);return {id:a.id,title:a.title,category:data.category,description:data.description,location:data.location,minAge:data.minAge,maxAge:data.maxAge,trial:publicTrial(data,Number(a.interest_count))};})});
  }
  if(path==='/api/auth/register'&&method==='POST'){
   const body=await readBody(req),email=String(body.email||'').trim().toLowerCase(),password=String(body.password||''),role=body.role;
@@ -82,8 +83,8 @@ export async function handleApi(req,env){
  }
  if(path==='/api/provider/activities'&&method==='GET'){
   if(user.role!=='provider')return bad('Forbidden',403);
-  const rows=await db.prepare('SELECT a.id,a.title,a.status,a.admin_note,a.created_at,a.updated_at,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.provider_id=? ORDER BY a.created_at DESC LIMIT 100').bind(user.id).all();
-  return json({activities:rows.results});
+  const rows=await db.prepare("SELECT a.id,a.title,a.status,a.admin_note,a.data_json,a.created_at,a.updated_at,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.provider_id=? ORDER BY a.created_at DESC LIMIT 100").bind(user.id).all();
+  return json({activities:(rows.results||[]).map(({data_json,...row})=>({...row,trial:publicTrial(JSON.parse(data_json),Number(row.interest_count))}))});
  }
  if(path==='/api/admin/activities'&&method==='GET'){
   if(user.role!=='admin')return bad('Forbidden',403);
