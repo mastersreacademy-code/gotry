@@ -98,3 +98,9 @@ After backing up D1 and testing migration 0008 on a **disposable local database*
 The API translates capacity/duplicate constraint failures to HTTP 409 rather than returning an opaque server error. Provider rosters no longer return or display children's ages. Child nicknames remain visible to the activity's owner, so real child information still requires a privacy/retention review.
 
 Run `python3 tests/session_capacity_sqlite_smoke.py` and existing SQLite suites; then run the full Wrangler D1 migration chain and browser integration tests on a local checkout. **Do not assume test scripts passed merely because they were committed.** Cloudflare production remains unchanged.
+
+### Critical migration 0008 correction
+
+The original 0008 table rebuild conflicted with `session_parent_outbox` from 0007: SQLite validates the trigger's reference to `interests` while renaming the replacement table, after the original table was dropped. Migration 0008 now temporarily drops **only** that trigger and recreates its original definition after the table rename. A representative SQLite migration test reproduced the failure and confirmed the corrected sequence. The full repository Wrangler D1 migration chain still requires execution.
+
+**If 0008 has already been applied to a database, do not blindly rerun it.** Check `PRAGMA table_info(interests)`, `SELECT name FROM sqlite_master WHERE type='trigger'`, and the migration history, and reconcile with a backup before applying 0009.
