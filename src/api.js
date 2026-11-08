@@ -94,6 +94,12 @@ export async function handleApi(req,env){
   const result=await db.prepare("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested') < ? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations')").bind(id,activityId,user.id,childName,childAge,activityId,capacity,activityId).run();
   if(result.meta?.changes!==1)return bad('Trial is full or unavailable',409);
   await notify(db,user.id,activityId,'interest_registered','Interest registered','Your interest was saved. This is not a confirmed booking.');
+  const total=await db.prepare("SELECT COUNT(*) AS n FROM interests WHERE activity_id=? AND status='interested'").bind(activityId).first();
+  const min=details.trialType==='group'?Number(details.minParticipants):1;
+  if(Number(total?.n)===min){
+   const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(activityId).first();
+   if(owner)await notify(db,owner.provider_id,activityId,'minimum_reached','Minimum interest reached','The trial reached its minimum number of interested children. Admin confirmation is still required.');
+  }
   return json({id,status:'interested'},201);
  }
  const withdraw=path.match(/^\/api\/parent\/interests\/([a-f0-9-]{36})\/withdraw$/);
