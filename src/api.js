@@ -82,7 +82,7 @@ export async function handleApi(req,env){
  }
  if(path==='/api/parent/interests'&&method==='GET'){
   if(user.role!=='parent')return bad('Forbidden',403);
-  const rows=await db.prepare("SELECT i.id,i.child_name,i.child_age,i.status,i.created_at,a.title,a.status AS activity_status,s.starts_at AS session_start,s.venue AS session_venue FROM interests i JOIN activities a ON a.id=i.activity_id LEFT JOIN trial_sessions s ON s.id=i.session_id WHERE i.parent_id=? ORDER BY i.created_at DESC LIMIT 100").bind(user.id).all();
+  const rows=await db.prepare("SELECT i.id,i.child_name,i.child_age,i.status,i.created_at,a.title,a.status AS activity_status,s.starts_at AS session_start,s.starts_at_utc AS session_start_utc,s.timezone AS session_timezone,s.status AS session_status,s.venue AS session_venue FROM interests i JOIN activities a ON a.id=i.activity_id LEFT JOIN trial_sessions s ON s.id=i.session_id WHERE i.parent_id=? ORDER BY i.created_at DESC LIMIT 100").bind(user.id).all();
   return json({interests:rows.results||[]});
  }
  if(path==='/api/parent/interests'&&method==='POST'){
