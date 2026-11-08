@@ -4,7 +4,7 @@ The repository deliberately has **no production D1 database ID**. No remote data
 
 1. In Cloudflare Dashboard → Storage & databases → D1, create a database named `gotry`.
 2. In the Worker settings → Bindings, add a **D1 database binding** named exactly `DB`, pointing to that database. This must match `env.DB` in `src/api.js`.
-3. Apply migrations **0001_initial.sql**, **0002_interest.sql**, and **0003_auth_throttle.sql** to the selected database in order, using Cloudflare D1's SQL console or Wrangler. Back up existing data before applying to an existing database.
+3. Apply migrations **0001_initial.sql**, **0002_interest.sql**, and **0003_auth_throttle.sql**, **0004_notifications.sql** to the selected database in order, using Cloudflare D1's SQL console or Wrangler. Back up existing data before applying to an existing database.
 4. Deploy the current `main` source manually, then check `/health`, `/account`, `/provider`, `/parent`, `/admin`, and `/activities`.
 5. Do not create admin accounts through public registration; a privileged manual provisioning process is still required.
 6. Do not use real credentials or real children's personal data yet. Login throttling now uses D1, but registration abuse prevention, email verification, privacy and retention policies remain incomplete.
@@ -25,7 +25,15 @@ To test locally, use `wrangler.ci.jsonc` and `wrangler d1 migrations apply gotry
 ## Manual checks before deployment
 
 1. Check `npm run check` locally or in a disposable environment (GitHub Actions remains disabled).
-2. Confirm D1 migrations were applied, including `0003_auth_throttle.sql` before testing login.
+2. Confirm D1 migrations were applied, including `0003_auth_throttle.sql` before testing login and `0004_notifications.sql` before testing submissions or approvals.
 3. Test parent/provider/admin authorization, registration, withdrawal, maximum capacity, and the admin lifecycle actions with synthetic data.
 4. Verify desktop and mobile layouts and confirm no production secrets appear in GitHub.
 5. Deploy manually only after these checks; a merge does not apply migrations automatically.
+
+## In-app notifications
+
+Migration `0004_notifications.sql` adds per-account notifications. New activity submissions, admin approval decisions, interest registrations, provider cancellation, and trial minimum decisions create notifications. The `/notifications` page lists only the signed-in user's notifications and allows marking them read. No emails or push notifications are sent.
+
+**Before manual deployment:** apply migration 0004. If it is missing, activity submissions and status changes can fail after the main database write. Test on a disposable D1 instance first. These operations are not yet transactionally coupled; production-grade notification reliability requires an outbox or equivalent.
+
+**Privacy:** Do not use actual children's names or ages during prototype testing. This version is not ready for public registrations. The app currently lacks verified emails, full abuse prevention, account recovery, privacy retention/deletion controls and independent end-to-end validation.
