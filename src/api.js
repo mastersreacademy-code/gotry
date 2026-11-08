@@ -3,6 +3,12 @@ const encoder=new TextEncoder();
 const json=(data,status=200,extra={})=>Response.json(data,{status,headers:{'cache-control':'no-store','x-robots-tag':'noindex, nofollow',...extra}});
 const bad=(message,status=400)=>json({error:message},status);
 const cookieName='gotry_session';
+async function notify(db,userId,activityId,kind,title,message){
+ await db.prepare('INSERT INTO notifications(id,user_id,activity_id,kind,title,message) VALUES(?,?,?,?,?,?)').bind(crypto.randomUUID(),userId,activityId,kind,title,message).run();
+}
+async function notifyInterested(db,activityId,kind,title,message){
+ await db.prepare("INSERT INTO notifications(id,user_id,activity_id,kind,title,message) SELECT lower(hex(randomblob(4)))||'-'||lower(hex(randomblob(2)))||'-4'||substr(lower(hex(randomblob(2))),2)||'-a'||substr(lower(hex(randomblob(2))),2)||'-'||lower(hex(randomblob(6))),parent_id,activity_id,?,?,? FROM (SELECT DISTINCT parent_id,activity_id FROM interests WHERE activity_id=? AND status='interested')").bind(kind,title,message,activityId).run();
+}
 function publicTrial(d,count=0){const min=d.trialType==='group'?Number(d.minParticipants):1;const max=d.trialType==='group'?Number(d.maxParticipants):1;return {type:d.trialType,date:d.trialDate,time:d.trialTime||'',minParticipants:min,maxParticipants:max,interestCount:count,remaining:Math.max(0,max-count),minimumReached:count>=min};}
 const hex=buffer=>Array.from(new Uint8Array(buffer),x=>x.toString(16).padStart(2,'0')).join('');
 async function sha256(s){return hex(await crypto.subtle.digest('SHA-256',encoder.encode(s)));}
@@ -55,6 +61,16 @@ export async function handleApi(req,env){
   return json({ok:true},200,{'set-cookie':sessionCookie('',0)});
  }
  if(!user)return bad('Unauthenticated',401);
+ if(path==='/api/notifications'&&method==='GET'){
+  const rows=await db.prepare('SELECT id,kind,title,message,activity_id,read_at,created_at FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 50').bind(user.id).all();
+  return json({notifications:rows.results||[]});
+ }
+ const readNotice=path.match(/^\/api\/notifications\/([a-f0-9-]{36})\/read$/);
+ if(readNotice&&method==='POST'){
+  const result=await db.prepare('UPDATE notifications SET read_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=? AND read_at IS NULL').bind(readNotice[1],user.id).run();
+  if(result.meta?.changes!==1)return bad('Notification unavailable or already read',404);
+  return json({ok:true});
+ }
  if(path==='/api/parent/interests'&&method==='GET'){
   if(user.role!=='parent')return bad('Forbidden',403);
   const rows=await db.prepare("SELECT i.id,i.child_name,i.child_age,i.status,i.created_at,a.title,a.status AS activity_status FROM interests i JOIN activities a ON a.id=i.activity_id WHERE i.parent_id=? ORDER BY i.created_at DESC LIMIT 100").bind(user.id).all();
@@ -71,10 +87,11 @@ export async function handleApi(req,env){
   if(!Number.isInteger(capacity)||capacity<1)return bad('Activity capacity is invalid',422);
   if(childAge<Number(details.minAge)||childAge>Number(details.maxAge))return bad('Age is outside the activity range',422);
   const existing=await db.prepare('SELECT id,status FROM interests WHERE activity_id=? AND parent_id=? AND child_name=?').bind(activityId,user.id,childName).first();
-  if(existing){if(existing.status==='interested')return bad('Interest already registered',409);const result=await db.prepare("UPDATE interests SET status='interested',child_age=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested') < ?").bind(childAge,existing.id,activityId,capacity).run();if(result.meta?.changes!==1)return bad('Trial is full',409);return json({id:existing.id,status:'interested'});}
+  if(existing){if(existing.status==='interested')return bad('Interest already registered',409);const result=await db.prepare("UPDATE interests SET status='interested',child_age=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested') < ?").bind(childAge,existing.id,activityId,capacity).run();if(result.meta?.changes!==1)return bad('Trial is full',409);await notify(db,user.id,activityId,'interest_registered','Interest restored','Your interest is active again. This is not a confirmed booking.');return json({id:existing.id,status:'interested'});}
   const id=crypto.randomUUID();
   const result=await db.prepare("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested') < ? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations')").bind(id,activityId,user.id,childName,childAge,activityId,capacity,activityId).run();
   if(result.meta?.changes!==1)return bad('Trial is full or unavailable',409);
+  await notify(db,user.id,activityId,'interest_registered','Interest registered','Your interest was saved. This is not a confirmed booking.');
   return json({id,status:'interested'},201);
  }
  const withdraw=path.match(/^\/api\/parent\/interests\/([a-f0-9-]{36})\/withdraw$/);
@@ -82,6 +99,7 @@ export async function handleApi(req,env){
   if(user.role!=='parent')return bad('Forbidden',403);
   const result=await db.prepare("UPDATE interests SET status='withdrawn',updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested'").bind(withdraw[1],user.id).run();
   if(result.meta?.changes!==1)return bad('Interest not found or already withdrawn',404);
+  await notify(db,user.id,null,'interest_withdrawn','Interest withdrawn','Your expression of interest was withdrawn.');
   return json({id:withdraw[1],status:'withdrawn'});
  }
  if(path==='/api/provider/activities'&&method==='POST'){
@@ -91,6 +109,7 @@ export async function handleApi(req,env){
   if(Object.keys(errors).length)return json({errors},422);
   const id=crypto.randomUUID();
   await db.prepare("INSERT INTO activities(id,provider_id,title,status,data_json) VALUES(?,?,?,'pending_approval',?)").bind(id,user.id,data.activityName,JSON.stringify(data)).run();
+  await notify(db,user.id,id,'activity_submitted','Activity submitted','Your activity is awaiting admin review.');
   return json({id,status:'pending_approval'},201);
  }
  if(path==='/api/provider/activities'&&method==='GET'){
@@ -104,6 +123,7 @@ export async function handleApi(req,env){
   const result=await db.prepare("UPDATE activities SET status='cancelled_by_provider',updated_at=CURRENT_TIMESTAMP WHERE id=? AND provider_id=? AND status IN ('pending_approval','pending_registrations')").bind(cancel[1],user.id).run();
   if(result.meta?.changes!==1)return bad('Activity unavailable or cannot be cancelled',409);
   await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,cancel[1],'cancel_by_provider').run();
+  await notifyInterested(db,cancel[1],'trial_cancelled','Trial cancelled','The provider has cancelled this trial. No payment was collected by GoTry.');
   return json({id:cancel[1],status:'cancelled_by_provider'});
  }
  if(path==='/api/admin/activities'&&method==='GET'){
@@ -140,6 +160,9 @@ export async function handleApi(req,env){
   const result=await db.prepare("UPDATE activities SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_registrations'").bind(status,lifecycle[1]).run();
   if(result.meta?.changes!==1)return bad('Activity already updated',409);
   await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,lifecycle[1],action).run();
+  const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(lifecycle[1]).first();
+  if(owner)await notify(db,owner.provider_id,lifecycle[1],'trial_status','Trial status updated',status.replaceAll('_',' '));
+  await notifyInterested(db,lifecycle[1],'trial_status','Trial status updated',status==='proceeding_pending_payments'?'Minimum interest reached. This is not a confirmed booking or payment request.':'The trial did not reach the minimum and has been cancelled.');
   return json({id:lifecycle[1],status});
  }
  const match=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})\/decision$/);
@@ -150,6 +173,8 @@ export async function handleApi(req,env){
   const result=await db.prepare("UPDATE activities SET status=?,admin_note=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_approval'").bind(status,note,match[1]).run();
   if(result.meta?.changes!==1)return bad('Activity unavailable or already reviewed',409);
   await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,match[1],body.decision).run();
+  const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(match[1]).first();
+  if(owner)await notify(db,owner.provider_id,match[1],'approval_decision',status==='rejected'?'Activity rejected':'Activity approved',status==='rejected'?'Admin rejected this submission. See your dashboard for feedback.':'Your activity is now open for expressions of interest.');
   return json({id:match[1],status});
  }
  return bad('Not found',404);
