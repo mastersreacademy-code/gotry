@@ -6,7 +6,7 @@ from pathlib import Path
 import sqlite3
 root=Path(__file__).resolve().parents[1]
 source=(root/'src/api.js').read_text(encoding='utf-8')
-prefix="SELECT i.id,CASE WHEN ?='confirmed' THEN i.child_name ELSE NULL END AS child_name"
+prefix="SELECT CASE WHEN ?='confirmed' THEN i.child_name ELSE NULL END AS child_name"
 start=source.index(prefix)
 end=source.index('").bind(',start)
 sql=source[start:end]
@@ -21,6 +21,6 @@ db.execute("INSERT INTO trial_sessions(id,activity_id,starts_at,ends_at,venue,mi
 db.execute("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age,session_id) VALUES('interest','activity','parent','Test Child',8,'slot')")
 for state in ('open','cancelled'):
     row=db.execute(sql,(state,'slot')).fetchone()
-    assert row[1] is None, f'Child name leaked in {state} roster'
-assert db.execute(sql,('confirmed','slot')).fetchone()[1]=='Test Child'
+    assert row[0] is None, f'Child name leaked in {state} roster'
+assert db.execute(sql,('confirmed','slot')).fetchone()[0]=='Test Child'
 print('PASS: all migrations and provider roster child-name minimization')
