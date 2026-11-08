@@ -139,3 +139,19 @@ The D1 script applies migrations **locally only**, checks migration 0009 and ver
 Registration now respects the provider's configured deadline even when a later session exists. The interest-insert path no longer creates a duplicate direct notification after the outbox trigger; the provider sees atomic interest notifications in the inbox. The prior post-insert minimum-reached notification has been removed because it could fail after the registration had already committed; minimum counts remain available to Provider and Admin dashboards.
 
 **Verification boundary:** This PR does not claim full Wrangler/Playwright execution in the assistant environment. GitHub checkout DNS and npm registry access are unavailable there. Review the commands' actual output on a local checkout before production; never run `wrangler deploy` as part of this gate.
+
+## Public discovery and transfer deadline regression
+
+Multi-session public discovery now reports **available session count** and **total free places across future open sessions**, rather than using the legacy activity-wide capacity. The public Register Interest control is disabled when every session is full, cancelled, confirmed or expired. Provider-defined registration deadlines are checked both before a transfer and inside the SQL UPDATE to prevent a midnight rollover race.
+
+From a full checkout, verify the **actual API SQL** against migrations using:
+
+```sh
+python3 tests/discovery_sqlite_smoke.py
+python3 tests/transfer_deadline_sqlite_smoke.py
+bash tests/wrangler-local-d1-smoke.sh
+npm run check
+npm run e2e
+```
+
+The Python scripts load all migration files and extract the production SQL directly from `src/api.js`; they fail if SQL changes break the expected results. The representative discovery SQL was separately exercised with SQLite in the assistant environment. Full migration execution on Wrangler D1 and Playwright browser execution remain unverified here. No Cloudflare deploy is included.
