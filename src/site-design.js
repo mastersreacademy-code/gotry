@@ -1,6 +1,6 @@
 // One visual system for Home, Explore, Wizard, Account, Dashboards, Admin and Notifications.
 // Keep styling as HTML/CSS rather than embedding text in images.
-export const siteHeader = `<header class="site-header"><a href="/" class="brand" aria-label="GoTry home">Go<span>Try</span></a><nav aria-label="Main navigation"><a href="/">Home</a><a href="/activities">Explore activities</a><a href="/provider/new">For providers</a><a href="/parent">Parent</a><a href="/provider">Provider</a><a href="/notifications">Notifications</a><a href="/account">Account</a></nav></header>`;
+export const siteHeader = `<header class="site-header"><a href="/" class="brand" aria-label="GoTry home">Go<span>Try</span></a><nav aria-label="Main navigation"><a href="/">Home</a><a href="/activities">Explore activities</a><a href="/provider/new">For providers</a><a href="/parent">Parent</a><a href="/provider">Provider</a><a href="/notifications">Notifications</a><a href="/account">Account</a><a href="/admin">Admin</a></nav></header>`;
 
 export const siteCss = `
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#10234a;background:#f8fbff;--ink:#10234a;--muted:#627089;--blue:#176dd0;--pink:#ed2282;--line:#e3e9f2;--paper:#fff;--radius:16px}
