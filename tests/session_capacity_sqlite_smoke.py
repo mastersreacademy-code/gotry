@@ -8,6 +8,7 @@ db=sqlite3.connect(':memory:')
 db.execute('PRAGMA foreign_keys=ON')
 for migration in sorted((root/'migrations').glob('*.sql')):
     db.executescript(migration.read_text(encoding='utf8'))
+assert db.execute("SELECT COUNT(*) FROM sqlite_master WHERE type='trigger' AND name='session_parent_outbox'").fetchone()[0]==1, 'migration 0008 lost session outbox trigger'
 for uid,role in [('provider','provider'),('parent','parent')]:
     db.execute('INSERT INTO users(id,email,password_hash,role) VALUES(?,?,?,?)',(uid,uid+'@example.test','x',role))
 db.execute("INSERT INTO activities(id,provider_id,title,status,data_json) VALUES('activity','provider','Trial','pending_registrations','{}')")
