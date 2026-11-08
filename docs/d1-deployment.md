@@ -55,3 +55,20 @@ Before manual Cloudflare deployment, back up D1 and apply `migrations/0006_sydne
 Provider Dashboard now supports owner-only rosters and rescheduling of open sessions while the activity awaits approval or registrations. Parents with active interest receive an in-app schedule-change notification. Roster data is not public. No emails or payments are sent. Session cancellation/confirmation remains admin-controlled.
 
 **Testing:** run `npm run check` and local Wrangler D1 integration tests before deployment. The code includes Sydney DST unit tests, but end-to-end D1 and browser tests must be independently verified. Prototype is not ready for real children's personal information.
+
+## Local verification after PR #11
+
+No GitHub Actions CI is required. In a checkout with Node and Wrangler installed, run:
+
+```sh
+npm install
+npm run check
+python3 tests/sqlite_d1_smoke.py
+npx wrangler d1 migrations apply gotry-ci --local --config wrangler.ci.jsonc
+```
+
+The Python script executes **all SQL migration files** against an in-memory SQLite database and checks interest capacity, admin confirmation and closed-session rejection. The Wrangler command applies migrations to an actual **local D1** instance; it does not touch production. It must be run from a repository checkout. Browser E2E tests require a locally running Worker with the local D1 binding.
+
+**Safety fixes:** Activity Discovery no longer treats aggregate interest across multiple sessions as a single capacity limit. The public sessions endpoint hides unapproved activity session counts. Only sessions with UTC instants are available for new registrations; older records created before migration 0006 must be reviewed/rescheduled to populate UTC. Provider cancellation of open sessions notifies interested parents. Admin decisions recheck minimum numbers atomically.
+
+**Known limitation:** Notifications are written after status changes rather than through a transactional outbox; a failed notification insert can leave the status updated. Real children and payments remain out of scope.
