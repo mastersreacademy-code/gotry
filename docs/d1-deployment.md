@@ -82,3 +82,11 @@ When an authenticated user opens `GET /api/notifications`, D1 `batch()` copies t
 Run `python3 tests/outbox_sqlite_smoke.py` and `python3 tests/sqlite_d1_smoke.py` after checkout. These run all migrations on local SQLite, validate trigger delivery, idempotency, per-user isolation, and rollback. They are not full Wrangler D1/Playwright E2E tests.
 
 Remaining work: transactionally link parent interest changes to notifications, confirm production migration on a disposable D1 database, test browser flows end-to-end, implement notification retention and privacy review before using real child data.
+
+## Migration 0008 — multi-session interests and parent transfers
+
+**Back up the D1 database before applying this migration.** Apply `migrations/0008_multi_session_interests.sql` after `0007`. The migration rebuilds the interests table while preserving existing IDs, registration statuses and session links. It replaces the old unique constraint (one child per activity) with one child **per trial session**; multiple sessions are now supported.
+
+The Parent Dashboard offers a **Change session** action. The API verifies parent ownership, target activity, available places, future Sydney time, status, age range and duplicate registration before updating the session ID. Parents can still withdraw one specific registration. SQLite triggers enqueue notifications for registration, restoration, transfer and withdrawal to the parent and provider, transactionally with the interest change. Outbox delivery happens when the recipient opens Notifications.
+
+Run `python3 tests/multi_session_sqlite_smoke.py`, `python3 tests/outbox_sqlite_smoke.py`, `python3 tests/sqlite_d1_smoke.py` and `npm run check` from a checkout. Then run the Wrangler local D1 migration and browser tests before any production deployment. **These test files are not evidence of execution**; their results must be checked in the local environment. Real child data and payments are not production-ready.
