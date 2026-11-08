@@ -18,3 +18,12 @@ test('provider roster fails closed without D1',async()=>{
  const r=await worker.fetch(new Request(base+'/api/provider/sessions/'+id+'/roster'));
  assert.equal(r.status,503);
 });
+
+test('provider cancellation rejects cross-origin writes',async()=>{
+ const r=await worker.fetch(new Request(base+'/api/provider/sessions/'+id+'/cancel',{method:'POST',headers:{origin:'https://attacker.example','content-type':'application/json'},body:'{}'}),{DB:{}});
+ assert.equal(r.status,403);
+});
+test('provider cancellation requires login',async()=>{
+ const r=await worker.fetch(new Request(base+'/api/provider/sessions/'+id+'/cancel',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:'{}'}),{DB:{}});
+ assert.equal(r.status,401);
+});
