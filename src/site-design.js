@@ -13,7 +13,7 @@ header.site-header{background:#fff;border-bottom:1px solid var(--line);padding:2
 .site-header nav{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .site-header nav a{color:#28476d;text-decoration:none;font-weight:650;font-size:14px}
 .site-header nav a:hover{color:var(--blue);text-decoration:underline}
-main{width:100%;max-width:1080px;margin:40px auto;padding:0 24px}
+main{width:100%;max-width:1080px;margin:40px auto;padding:0 24px}main.home-main{margin:0 auto;padding:72px 24px}
 main h1{color:var(--ink);font-size:clamp(32px,5vw,48px);letter-spacing:-1.35px;line-height:1.13;margin:0 0 20px}
 main h2,main h3{color:var(--ink);line-height:1.3}
 main p{line-height:1.65}
@@ -27,6 +27,6 @@ main input,main select,main textarea{font:inherit;max-width:100%;border:1px soli
 main a{color:var(--blue)}
 main button:focus-visible,main input:focus-visible,main select:focus-visible,main textarea:focus-visible,a:focus-visible{outline:3px solid #74a7f5;outline-offset:2px}
 main .note{border-radius:12px}
-@media(max-width:700px){header.site-header{padding:16px 20px;align-items:flex-start;gap:12px}header.site-header nav{gap:10px 14px}header.site-header nav a{font-size:13px}main{margin:26px auto;padding:0 18px}main .panel,main article{padding:18px}main h1{font-size:clamp(30px,8vw,40px)}}
+@media(max-width:700px){header.site-header{padding:16px 20px;align-items:flex-start;gap:12px}header.site-header nav{gap:10px 14px}header.site-header nav a{font-size:13px}main{margin:26px auto;padding:0 18px}main.home-main{margin:0 auto;padding:42px 18px}main .panel,main article{padding:18px}main h1{font-size:clamp(30px,8vw,40px)}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 `;
