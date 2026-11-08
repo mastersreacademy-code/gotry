@@ -32,8 +32,17 @@ export async function handleApi(req,env){
  }
  if(path==='/api/auth/login'&&method==='POST'){
   const body=await readBody(req),email=String(body.email||'').trim().toLowerCase(),password=String(body.password||'');
+  if(email.length>254||password.length>128)return bad('Invalid credentials',401);
+  const now=Math.floor(Date.now()/1000),emailHash=await sha256(email);
+  const attempts=await db.prepare('SELECT attempts,window_started,blocked_until FROM auth_attempts WHERE email_hash=?').bind(emailHash).first();
+  if(attempts&&attempts.blocked_until>now)return bad('Too many attempts. Try again later',429);
   const user=await db.prepare('SELECT id,email,role,password_hash FROM users WHERE email=?').bind(email).first();
-  if(!user||!await passwordMatches(password,user.password_hash))return bad('Invalid credentials',401);
+  if(!user||!await passwordMatches(password,user.password_hash)){
+   const within=attempts&&now-attempts.window_started<900,failed=within?attempts.attempts+1:1;
+   await db.prepare('INSERT INTO auth_attempts(email_hash,attempts,window_started,blocked_until) VALUES(?,?,?,?) ON CONFLICT(email_hash) DO UPDATE SET attempts=excluded.attempts,window_started=excluded.window_started,blocked_until=excluded.blocked_until').bind(emailHash,failed,within?attempts.window_started:now,failed>=5?now+900:0).run();
+   return bad('Invalid credentials',401);
+  }
+  await db.prepare('DELETE FROM auth_attempts WHERE email_hash=?').bind(emailHash).run();
   const token=hex(crypto.getRandomValues(new Uint8Array(32))),hash=await sha256(token),expiry=Math.floor(Date.now()/1000)+86400;
   await db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(hash,user.id,expiry).run();
   return json({user:{id:user.id,email:user.email,role:user.role}},200,{'set-cookie':sessionCookie(token,86400)});
