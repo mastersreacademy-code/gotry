@@ -178,6 +178,30 @@ export async function handleApi(req,env){
   const rows=await db.prepare("SELECT a.id,a.title,a.status,a.data_json,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.status='pending_registrations' ORDER BY a.created_at ASC LIMIT 100").all();
   return json({trials:(rows.results||[]).map(({data_json,...a})=>({...a,trial:publicTrial(JSON.parse(data_json),Number(a.interest_count))}))});
  }
+ if(path==='/api/admin/sessions'&&method==='GET'){
+  if(user.role!=='admin')return bad('Forbidden',403);
+  const rows=await db.prepare("SELECT s.id,s.activity_id,s.starts_at,s.ends_at,s.venue,s.min_participants,s.max_participants,s.status,a.title,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE a.status='pending_registrations' ORDER BY s.starts_at ASC LIMIT 100").all();
+  return json({sessions:rows.results||[]});
+ }
+ const sessionDecision=path.match(/^\/api\/admin\/sessions\/([a-f0-9-]{36})\/decision$/);
+ if(sessionDecision&&method==='POST'){
+  if(user.role!=='admin')return bad('Forbidden',403);
+  const b=await readBody(req),decision=String(b.decision||'');
+  if(!['confirm','cancel'].includes(decision))return bad('Invalid decision');
+  const s=await db.prepare("SELECT s.activity_id,s.starts_at,s.min_participants,s.status,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.status='pending_registrations'").bind(sessionDecision[1]).first();
+  if(!s||s.status!=='open')return bad('Session unavailable',409);
+  if(decision==='confirm'&&s.interested<s.min_participants)return bad('Minimum not reached',409);
+  if(decision==='cancel'&&(s.interested>=s.min_participants||s.starts_at.slice(0,10)>=new Date().toISOString().slice(0,10)))return bad('Cannot cancel before session date or when minimum is reached',409);
+  const next=decision==='confirm'?'confirmed':'cancelled';
+  const changed=await db.prepare("UPDATE trial_sessions SET status=? WHERE id=? AND status='open'").bind(next,sessionDecision[1]).run();
+  if(changed.meta?.changes!==1)return bad('Already updated',409);
+  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,s.activity_id,'session_'+decision).run();
+  const parents=await db.prepare("SELECT DISTINCT parent_id FROM interests WHERE session_id=? AND status='interested'").bind(sessionDecision[1]).all();
+  for(const p of parents.results||[])await notify(db,p.parent_id,s.activity_id,'session_status','Trial session '+next,decision==='confirm'?'Minimum interest reached. This is not a confirmed payment or booking.':'This trial session has been cancelled.');
+  const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(s.activity_id).first();
+  if(owner)await notify(db,owner.provider_id,s.activity_id,'session_status','Trial session '+next,'A trial session has been '+next+' by admin.');
+  return json({id:sessionDecision[1],status:next});
+ }
  const detail=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})$/);
  if(detail&&method==='GET'){
   if(user.role!=='admin')return bad('Forbidden',403);
