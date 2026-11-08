@@ -80,7 +80,7 @@ export async function handleApi(req,env){
  }
  if(path==='/api/parent/interests'&&method==='GET'){
   if(user.role!=='parent')return bad('Forbidden',403);
-  const rows=await db.prepare("SELECT i.id,i.child_name,i.child_age,i.status,i.created_at,a.title,a.status AS activity_status FROM interests i JOIN activities a ON a.id=i.activity_id WHERE i.parent_id=? ORDER BY i.created_at DESC LIMIT 100").bind(user.id).all();
+  const rows=await db.prepare("SELECT i.id,i.child_name,i.child_age,i.status,i.created_at,a.title,a.status AS activity_status,s.starts_at AS session_start,s.venue AS session_venue FROM interests i JOIN activities a ON a.id=i.activity_id LEFT JOIN trial_sessions s ON s.id=i.session_id WHERE i.parent_id=? ORDER BY i.created_at DESC LIMIT 100").bind(user.id).all();
   return json({interests:rows.results||[]});
  }
  if(path==='/api/parent/interests'&&method==='POST'){
@@ -112,8 +112,8 @@ export async function handleApi(req,env){
   const result=await db.prepare("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age,session_id) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)) < ? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations')").bind(id,activityId,user.id,childName,childAge,sessionId||null,activityId,sessionId,sessionId,capacity,activityId).run();
   if(result.meta?.changes!==1)return bad('Trial is full or unavailable',409);
   await notify(db,user.id,activityId,'interest_registered','Interest registered','Your interest was saved. This is not a confirmed booking.');
-  const total=await db.prepare("SELECT COUNT(*) AS n FROM interests WHERE activity_id=? AND status='interested'").bind(activityId).first();
-  const min=details.trialType==='group'?Number(details.minParticipants):1;
+  const total=await db.prepare("SELECT COUNT(*) AS n FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)").bind(activityId,sessionId,sessionId).first();
+  const min=session?Number((await db.prepare('SELECT min_participants FROM trial_sessions WHERE id=?').bind(sessionId).first()).min_participants):(details.trialType==='group'?Number(details.minParticipants):1);
   if(Number(total?.n)===min){
    const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(activityId).first();
    if(owner)await notify(db,owner.provider_id,activityId,'minimum_reached','Minimum interest reached','The trial reached its minimum number of interested children. Admin confirmation is still required.');
@@ -156,7 +156,7 @@ export async function handleApi(req,env){
  }
  if(path==='/api/provider/activities'&&method==='GET'){
   if(user.role!=='provider')return bad('Forbidden',403);
-  const rows=await db.prepare("SELECT a.id,a.title,a.status,a.admin_note,a.data_json,a.created_at,a.updated_at,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.provider_id=? ORDER BY a.created_at DESC LIMIT 100").bind(user.id).all();
+  const rows=await db.prepare("SELECT a.id,a.title,a.status,a.admin_note,a.data_json,a.created_at,a.updated_at,(SELECT COUNT(*) FROM trial_sessions s WHERE s.activity_id=a.id) AS session_count,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.provider_id=? ORDER BY a.created_at DESC LIMIT 100").bind(user.id).all();
   return json({activities:(rows.results||[]).map(({data_json,...row})=>({...row,trial:publicTrial(JSON.parse(data_json),Number(row.interest_count))}))});
  }
  const cancel=path.match(/^\/api\/provider\/activities\/([a-f0-9-]{36})\/cancel$/);
