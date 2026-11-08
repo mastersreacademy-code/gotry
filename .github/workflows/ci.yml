@@ -17,4 +17,5 @@ jobs:
       - run: npm run check
       - run: npx wrangler deploy --dry-run --outdir dist
       - run: npx playwright install --with-deps chromium
+      - run: npx wrangler d1 migrations apply gotry-ci --local --config wrangler.ci.jsonc
       - run: npm run e2e
