@@ -238,9 +238,11 @@ export async function handleApi(req,env){
   if(decision==='confirm'&&s.interested<s.min_participants)return bad('Minimum not reached',409);
   if(decision==='cancel'&&(s.interested>=s.min_participants||(s.starts_at_utc?s.starts_at_utc>=new Date().toISOString():s.starts_at.slice(0,10)>=utcToSydney(new Date().toISOString()).slice(0,10))))return bad('Cannot cancel before session date or when minimum is reached',409);
   const next=decision==='confirm'?'confirmed':'cancelled';
-  const changed=await db.prepare("UPDATE trial_sessions SET status=? WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND status='pending_registrations') AND ((?='confirmed' AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')>=min_participants) OR (?='cancelled' AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')<min_participants AND (starts_at_utc IS NOT NULL AND starts_at_utc<?)))").bind(next,sessionDecision[1],next,next,new Date().toISOString()).run();
+  const [changed]=await db.batch([
+   db.prepare("UPDATE trial_sessions SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND status='pending_registrations') AND ((?='confirmed' AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')>=min_participants) OR (?='cancelled' AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')<min_participants AND starts_at_utc IS NOT NULL AND starts_at_utc<?))").bind(next,sessionDecision[1],next,next,new Date().toISOString()),
+   db.prepare("INSERT INTO audit_events(id,actor_id,activity_id,action) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND status=?)").bind(crypto.randomUUID(),user.id,s.activity_id,'session_'+decision,sessionDecision[1],next)
+  ]);
   if(changed.meta?.changes!==1)return bad('Already updated',409);
-  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,s.activity_id,'session_'+decision).run();
   return json({id:sessionDecision[1],status:next});
  }
  const detail=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})$/);
