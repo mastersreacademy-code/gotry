@@ -22,7 +22,7 @@ for migration in sorted((root / 'migrations').glob('*.sql')):
 db.execute("INSERT INTO users(id,email,password_hash,role) VALUES('provider','provider@example.test','x','provider')")
 db.execute("INSERT INTO users(id,email,password_hash,role) VALUES('parent','parent@example.test','x','parent')")
 db.execute("INSERT INTO activities(id,provider_id,title,status,data_json) VALUES('activity','provider','Trial','pending_registrations','{\"deadline\":\"2026-11-07\"}')")
-for sid, starts in [('old','2098-12-31T23:00:00.000Z'),('new','2098-12-31T23:00:00.000Z'),('past','2000-01-01T00:00:00.000Z')]:
+for sid, starts in [('old','2098-12-31T23:00:00.000Z'),('new','2098-12-31T23:00:00.000Z'),('past','2098-12-31T23:00:00.000Z')]:
     db.execute("INSERT INTO trial_sessions(id,activity_id,starts_at,ends_at,venue,min_participants,max_participants,starts_at_utc,ends_at_utc) VALUES(?,'activity','2099-01-01T10:00','2099-01-01T11:00','Sydney',1,2,?,?)",(sid,starts,starts))
 
 insert = statement('INSERT INTO interests(id,activity_id,parent_id,child_name,child_age,session_id) SELECT')
@@ -47,10 +47,12 @@ assert confirm.count('?') == 6, 'Admin decision SQL bind count changed'
 # Admin cannot confirm an already-expired session even if minimum is met.
 db.execute("UPDATE activities SET data_json='{\"deadline\":\"2099-01-01\"}' WHERE id='activity'")
 db.execute("UPDATE interests SET status='interested' WHERE id='interest'")
-db.execute("UPDATE interests SET session_id='past' WHERE id='interest'") if False else None
+db.execute("UPDATE interests SET session_id='past' WHERE id='interest'")
+db.execute("UPDATE trial_sessions SET starts_at_utc='2000-01-01T00:00:00.000Z' WHERE id='past'")
 decision_args = ('confirmed','past','confirmed','2026-11-08T00:00:00.000Z','confirmed','2026-11-08T00:00:00.000Z')
 db.execute(confirm,decision_args)
 assert db.execute("SELECT status FROM trial_sessions WHERE id='past'").fetchone()[0] == 'open'
+db.execute("UPDATE interests SET session_id='old' WHERE id='interest'")
 decision_args = ('confirmed','old','confirmed','2026-11-08T00:00:00.000Z','confirmed','2026-11-08T00:00:00.000Z')
 db.execute(confirm,decision_args)
 assert db.execute("SELECT status FROM trial_sessions WHERE id='old'").fetchone()[0] == 'confirmed'
