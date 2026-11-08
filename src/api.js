@@ -177,7 +177,7 @@ export async function handleApi(req,env){
   if(user.role!=='provider')return bad('Forbidden',403);
   const owned=await db.prepare('SELECT s.id FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=?').bind(roster[1],user.id).first();
   if(!owned)return bad('Not found',404);
-  const rows=await db.prepare("SELECT i.id,i.child_name,i.child_age,i.status,i.created_at FROM interests i WHERE i.session_id=? AND i.status='interested' ORDER BY i.created_at ASC LIMIT 100").bind(roster[1]).all();
+  const rows=await db.prepare("SELECT i.id,i.child_name,i.status,i.created_at FROM interests i WHERE i.session_id=? AND i.status='interested' ORDER BY i.created_at ASC LIMIT 100").bind(roster[1]).all();
   return json({roster:rows.results||[]});
  }
  const cancelSession=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/cancel$/);
@@ -305,5 +305,5 @@ export async function handleApi(req,env){
   return json({id:match[1],status});
  }
  return bad('Not found',404);
- }catch(e){if(e instanceof SyntaxError)return bad('Invalid JSON');if(e.message==='Request too large')return bad(e.message,413);return bad('Request failed',500);}
+ }catch(e){if(e instanceof SyntaxError)return bad('Invalid JSON');if(e.message==='Request too large')return bad(e.message,413);if(/trial session unavailable or full|UNIQUE constraint failed: interests|interests_child_session_unique|interests_child_legacy_unique/i.test(String(e.message||'')))return bad('Session unavailable, full or already registered',409);return bad('Request failed',500);}
 }
