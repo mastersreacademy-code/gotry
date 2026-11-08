@@ -121,12 +121,6 @@ export async function handleApi(req,env){
   const result=await db.prepare("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age,session_id) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)) < ? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations') AND (?='' OR EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND status='open' AND starts_at_utc>?))").bind(id,activityId,user.id,childName,childAge,sessionId||null,activityId,sessionId,sessionId,capacity,activityId,sessionId,sessionId,new Date().toISOString()).run();
   if(result.meta?.changes!==1)return bad('Trial is full or unavailable',409);
   // Interest triggers enqueue parent/provider notifications atomically with this insert.
-  const total=await db.prepare("SELECT COUNT(*) AS n FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)").bind(activityId,sessionId,sessionId).first();
-  const min=session?Number((await db.prepare('SELECT min_participants FROM trial_sessions WHERE id=?').bind(sessionId).first()).min_participants):(details.trialType==='group'?Number(details.minParticipants):1);
-  if(Number(total?.n)===min){
-   const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(activityId).first();
-   if(owner)await db.prepare("INSERT INTO session_notification_outbox(id,user_id,activity_id,kind,title,message) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID().replaceAll('-',''),owner.provider_id,activityId,'minimum_reached','Minimum interest reached','The trial reached its minimum interest count; admin confirmation is still required.').run();
-  }
   return json({id,status:'interested'},201);
  }
  const transfer=path.match(/^\/api\/parent\/interests\/([a-f0-9-]{36})\/transfer$/);
