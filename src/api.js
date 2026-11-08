@@ -31,7 +31,7 @@ export async function handleApi(req,env){
   const activityId=url.searchParams.get('activityId')||'';
   if(!/^[a-f0-9-]{36}$/.test(activityId))return bad('Valid activity ID required');
   const rows=await db.prepare("SELECT s.id,s.starts_at,s.ends_at,s.starts_at_utc,s.ends_at_utc,s.timezone,s.venue,s.min_participants,s.max_participants,s.status,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.activity_id=? AND a.status='pending_registrations' AND s.status='open' AND s.starts_at_utc>? ORDER BY COALESCE(s.starts_at_utc,s.starts_at) ASC LIMIT 50").bind(activityId,new Date().toISOString()).all();
-  const count=await db.prepare('SELECT COUNT(*) AS n FROM trial_sessions WHERE activity_id=? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations')').bind(activityId,activityId).first();
+  const count=await db.prepare("SELECT COUNT(*) AS n FROM trial_sessions WHERE activity_id=? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations')").bind(activityId,activityId).first();
   return json({hasSessions:Number(count.n)>0,sessions:(rows.results||[]).map(s=>({...s,remaining:Math.max(0,s.max_participants-s.interested),minimumReached:s.interested>=s.min_participants}))});
  }
  if(path==='/api/activities'&&method==='GET'){
