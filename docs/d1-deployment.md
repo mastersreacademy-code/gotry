@@ -155,3 +155,11 @@ npm run e2e
 ```
 
 The Python scripts load all migration files and extract the production SQL directly from `src/api.js`; they fail if SQL changes break the expected results. The representative discovery SQL was separately exercised with SQLite in the assistant environment. Full migration execution on Wrangler D1 and Playwright browser execution remain unverified here. No Cloudflare deploy is included.
+
+## Registration and Admin confirmation consistency
+
+The registration **INSERT** and withdrawn-interest **restore UPDATE** now enforce the provider's deadline inside the SQL statement, not just during pre-validation. Admin session confirmation requires the Sydney session's UTC start to be in the future, checked both in API validation and the conditional SQL UPDATE. The Admin dashboard disables confirmation for expired sessions using `starts_at_utc`, consistent with the server.
+
+From a complete checkout, run `python3 tests/session_atomic_state_sqlite.py` to execute the **actual SQL extracted from src/api.js** after applying migrations 0001–0009 in SQLite. The script checks expired deadlines for new/restored interests, successful future registrations, expired Admin confirmation, successful confirmation and notification outbox. Run `npm run check`, `bash tests/wrangler-local-d1-smoke.sh` and `npm run e2e` separately; the SQLite test does not substitute for actual Wrangler D1 or browser tests.
+
+The expanded `tests/session-write-security.test.js` covers anonymous and cross-origin writes across Parent, Provider and Admin session endpoints. It is not a substitute for authenticated cross-role and ownership E2E tests. Avoid using actual children's names or personal information in test fixtures. Do not deploy until the full D1 migration chain and role-based flows have been validated.
