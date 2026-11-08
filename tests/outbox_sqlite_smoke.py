@@ -36,6 +36,11 @@ for user in ("parent","provider"):
         db.execute(ack,(user,))
 assert db.execute("SELECT COUNT(*) FROM notifications").fetchone()[0]==baseline+2
 assert db.execute("SELECT COUNT(*) FROM session_notification_outbox WHERE delivered_at IS NULL").fetchone()[0]==0
+# Outbox and inbox must not leak child names or ages into notification messages.
+for table in ("session_notification_outbox","notifications"):
+    exposed=db.execute("SELECT COUNT(*) FROM "+table+" WHERE instr(message,'Child')>0 OR instr(title,'Child')>0").fetchone()[0]
+    assert exposed==0, f"Child data leaked into {table}"
+
 db.execute("UPDATE trial_sessions SET starts_at='2099-01-02T10:00',venue='New venue' WHERE id='slot'")
 assert db.execute("SELECT COUNT(*) FROM session_notification_outbox WHERE delivered_at IS NULL").fetchone()[0]==2
 db.execute("INSERT INTO users(id,email,password_hash,role) VALUES('other','other@example.test','x','parent')")
