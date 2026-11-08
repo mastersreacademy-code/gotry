@@ -102,7 +102,7 @@ export async function handleApi(req,env){
    if(Number(slots.n)>0)return bad('Select a trial session',422);
   }
   if(!Number.isInteger(capacity)||capacity<1)return bad('Activity capacity is invalid',422);
-  const deadline=details.deadline||details.trialDate;
+  const deadline=session?session.starts_at.slice(0,10):(details.deadline||details.trialDate);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(deadline)||deadline<new Date().toISOString().slice(0,10))return bad('Registration deadline has passed',409);
   if(childAge<Number(details.minAge)||childAge>Number(details.maxAge))return bad('Age is outside the activity range',422);
   const existing=await db.prepare('SELECT id,status,session_id FROM interests WHERE activity_id=? AND parent_id=? AND child_name=?').bind(activityId,user.id,childName).first();
