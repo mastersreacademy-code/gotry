@@ -175,7 +175,7 @@ export async function handleApi(req,env){
  }
  if(path==='/api/admin/trials'&&method==='GET'){
   if(user.role!=='admin')return bad('Forbidden',403);
-  const rows=await db.prepare("SELECT a.id,a.title,a.status,a.data_json,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.status='pending_registrations' ORDER BY a.created_at ASC LIMIT 100").all();
+  const rows=await db.prepare("SELECT a.id,a.title,a.status,a.data_json,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.status='pending_registrations' AND NOT EXISTS(SELECT 1 FROM trial_sessions s WHERE s.activity_id=a.id) ORDER BY a.created_at ASC LIMIT 100").all();
   return json({trials:(rows.results||[]).map(({data_json,...a})=>({...a,trial:publicTrial(JSON.parse(data_json),Number(a.interest_count))}))});
  }
  if(path==='/api/admin/sessions'&&method==='GET'){
@@ -216,6 +216,8 @@ export async function handleApi(req,env){
   if(!['confirm_minimum','cancel_low_numbers'].includes(action))return bad('Invalid lifecycle action');
   const activity=await db.prepare("SELECT data_json,status FROM activities WHERE id=?").bind(lifecycle[1]).first();
   if(!activity||activity.status!=='pending_registrations')return bad('Activity is not awaiting registrations',409);
+  const scheduled=await db.prepare('SELECT COUNT(*) AS n FROM trial_sessions WHERE activity_id=?').bind(lifecycle[1]).first();
+  if(Number(scheduled.n)>0)return bad('Manage scheduled sessions individually',409);
   const details=JSON.parse(activity.data_json);
   const count=await db.prepare("SELECT COUNT(*) AS total FROM interests WHERE activity_id=? AND status='interested'").bind(lifecycle[1]).first();
   const minimum=details.trialType==='group'?Number(details.minParticipants):1;
