@@ -135,6 +135,7 @@ export async function handleApi(req,env){
   const minimum=details.trialType==='group'?Number(details.minParticipants):1;
   if(action==='confirm_minimum'&&Number(count.total)<minimum)return bad('Minimum participants not reached',409);
   if(action==='cancel_low_numbers'&&Number(count.total)>=minimum)return bad('Minimum already reached',409);
+  if(action==='cancel_low_numbers'){const deadline=details.deadline||details.trialDate;if(!/^\d{4}-\d{2}-\d{2}$/.test(deadline)||deadline>=new Date().toISOString().slice(0,10))return bad('Registration deadline has not passed',409);}
   const status=action==='confirm_minimum'?'proceeding_pending_payments':'cancelled_low_numbers';
   const result=await db.prepare("UPDATE activities SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_registrations'").bind(status,lifecycle[1]).run();
   if(result.meta?.changes!==1)return bad('Activity already updated',409);
