@@ -134,21 +134,21 @@ export async function handleApi(req,env){
   if(user.role!=='parent')return bad('Forbidden',403);
   const b=await readBody(req),target=String(b.sessionId||'');
   if(!/^[a-f0-9-]{36}$/.test(target))return bad('Valid target session required',422);
-  const interest=await db.prepare("SELECT i.activity_id,i.session_id,i.status,i.child_age,a.data_json FROM interests i JOIN activities a ON a.id=i.activity_id WHERE i.id=? AND i.parent_id=? AND a.status='pending_registrations'").bind(transfer[1],user.id).first();
+  const interest=await db.prepare("SELECT i.activity_id,i.session_id,i.status,i.child_age,a.data_json FROM interests i JOIN activities a ON a.id=i.activity_id LEFT JOIN trial_sessions source ON source.id=i.session_id WHERE i.id=? AND i.parent_id=? AND a.status='pending_registrations' AND (i.session_id IS NULL OR source.status='open')").bind(transfer[1],user.id).first();
   if(!interest||interest.status!=='interested')return bad('Active interest not found',404);
   if(interest.session_id===target)return bad('Already in this session',409);
   const d=JSON.parse(interest.data_json);
   if(interest.child_age<Number(d.minAge)||interest.child_age>Number(d.maxAge))return bad('Age outside activity range',422);
   const now=new Date().toISOString(),today=utcToSydney(now).slice(0,10);
-  const updated=await db.prepare("UPDATE interests SET session_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested' AND NOT EXISTS(SELECT 1 FROM interests other WHERE other.activity_id=interests.activity_id AND other.parent_id=interests.parent_id AND other.child_name=interests.child_name AND other.session_id=? AND other.id<>interests.id) AND EXISTS(SELECT 1 FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND s.activity_id=interests.activity_id AND s.status='open' AND s.starts_at_utc>? AND substr(s.starts_at,1,10)>=? AND a.status='pending_registrations' AND (SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested')<s.max_participants)").bind(target,transfer[1],user.id,target,target,now,today).run();
+  const updated=await db.prepare("UPDATE interests SET session_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested' AND NOT EXISTS(SELECT 1 FROM interests other WHERE other.activity_id=interests.activity_id AND other.parent_id=interests.parent_id AND other.child_name=interests.child_name AND other.session_id=? AND other.id<>interests.id) AND EXISTS(SELECT 1 FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND s.activity_id=interests.activity_id AND s.status='open' AND s.starts_at_utc>? AND substr(s.starts_at,1,10)>=? AND a.status='pending_registrations' AND (interests.session_id IS NULL OR EXISTS(SELECT 1 FROM trial_sessions old WHERE old.id=interests.session_id AND old.status='open')) AND (SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested')<s.max_participants)").bind(target,transfer[1],user.id,target,target,now,today).run();
   if(updated.meta?.changes!==1)return bad('Target session unavailable, full or already registered',409);
   return json({id:transfer[1],sessionId:target,status:'interested'});
  }
  const withdraw=path.match(/^\/api\/parent\/interests\/([a-f0-9-]{36})\/withdraw$/);
  if(withdraw&&method==='POST'){
   if(user.role!=='parent')return bad('Forbidden',403);
-  const result=await db.prepare("UPDATE interests SET status='withdrawn',updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested'").bind(withdraw[1],user.id).run();
-  if(result.meta?.changes!==1)return bad('Interest not found or already withdrawn',404);
+  const result=await db.prepare("UPDATE interests SET status='withdrawn',updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested' AND (session_id IS NULL OR EXISTS(SELECT 1 FROM trial_sessions s WHERE s.id=interests.session_id AND s.status='open'))").bind(withdraw[1],user.id).run();
+  if(result.meta?.changes!==1)return bad('Interest unavailable, already withdrawn or session closed',409);
   
   return json({id:withdraw[1],status:'withdrawn'});
  }
