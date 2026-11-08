@@ -137,6 +137,7 @@ export async function handleApi(req,env){
   const interest=await db.prepare("SELECT i.activity_id,i.session_id,i.status,i.child_age,a.data_json FROM interests i JOIN activities a ON a.id=i.activity_id LEFT JOIN trial_sessions source ON source.id=i.session_id WHERE i.id=? AND i.parent_id=? AND a.status='pending_registrations' AND (i.session_id IS NULL OR source.status='open')").bind(transfer[1],user.id).first();
   if(!interest||interest.status!=='interested')return bad('Active interest not found',404);
   if(interest.session_id===target)return bad('Already in this session',409);
+  if(interest.session_id===null)return bad('Legacy interests cannot be transferred until their trial session is assigned',409);
   const d=JSON.parse(interest.data_json);
   if(interest.child_age<Number(d.minAge)||interest.child_age>Number(d.maxAge))return bad('Age outside activity range',422);
   const now=new Date().toISOString(),today=utcToSydney(now).slice(0,10);
