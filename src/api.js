@@ -183,7 +183,7 @@ export async function handleApi(req,env){
   const s=await db.prepare("SELECT s.activity_id,s.status FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=? AND a.status IN ('pending_approval','pending_registrations')").bind(cancelSession[1],user.id).first();
   if(!s)return bad('Not found',404);
   if(s.status!=='open')return bad('Only open sessions can be cancelled',409);
-  const changed=await db.prepare("UPDATE trial_sessions SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND provider_id=? AND status IN ('pending_approval','pending_registrations'))").bind(cancelSession[1],user.id).run();
+  const changed=await db.prepare("UPDATE trial_sessions SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND starts_at_utc>? AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND provider_id=? AND status IN ('pending_approval','pending_registrations'))").bind(cancelSession[1],user.id).run();
   if(changed.meta?.changes!==1)return bad('Session already changed',409);
   return json({id:cancelSession[1],status:'cancelled'});
  }
@@ -197,7 +197,7 @@ export async function handleApi(req,env){
   const session=await db.prepare("SELECT s.activity_id,s.starts_at,s.venue,s.status,a.status AS activity_status FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=?").bind(reschedule[1],user.id).first();
   if(!session)return bad('Not found',404);
   if(session.status!=='open'||!['pending_approval','pending_registrations'].includes(session.activity_status))return bad('Only open sessions can be rescheduled',409);
-  const changed=await db.prepare("UPDATE trial_sessions SET starts_at=?,ends_at=?,starts_at_utc=?,ends_at_utc=?,venue=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND provider_id=? AND status IN ('pending_approval','pending_registrations'))").bind(start,end,startUtc,endUtc,venue,reschedule[1],user.id).run();
+  const changed=await db.prepare("UPDATE trial_sessions SET starts_at=?,ends_at=?,starts_at_utc=?,ends_at_utc=?,venue=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND provider_id=? AND status IN ('pending_approval','pending_registrations'))").bind(start,end,startUtc,endUtc,venue,reschedule[1],new Date().toISOString(),user.id).run();
   if(changed.meta?.changes!==1)return bad('Session changed',409);
   return json({id:reschedule[1],startsAt:start,endsAt:end,timezone:'Australia/Sydney'});
  }
