@@ -109,6 +109,24 @@ export async function handleApi(req,env){
   if(!activity)return bad('Not found',404);
   return json({activity:{id:activity.id,title:activity.title,status:activity.status,details:JSON.parse(activity.data_json),adminNote:activity.admin_note,createdAt:activity.created_at}});
  }
+ const lifecycle=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})\/lifecycle$/);
+ if(lifecycle&&method==='POST'){
+  if(user.role!=='admin')return bad('Forbidden',403);
+  const body=await readBody(req),action=String(body.action||'');
+  if(!['confirm_minimum','cancel_low_numbers'].includes(action))return bad('Invalid lifecycle action');
+  const activity=await db.prepare("SELECT data_json,status FROM activities WHERE id=?").bind(lifecycle[1]).first();
+  if(!activity||activity.status!=='pending_registrations')return bad('Activity is not awaiting registrations',409);
+  const details=JSON.parse(activity.data_json);
+  const count=await db.prepare("SELECT COUNT(*) AS total FROM interests WHERE activity_id=? AND status='interested'").bind(lifecycle[1]).first();
+  const minimum=details.trialType==='group'?Number(details.minParticipants):1;
+  if(action==='confirm_minimum'&&Number(count.total)<minimum)return bad('Minimum participants not reached',409);
+  if(action==='cancel_low_numbers'&&Number(count.total)>=minimum)return bad('Minimum already reached',409);
+  const status=action==='confirm_minimum'?'proceeding_pending_payments':'cancelled_low_numbers';
+  const result=await db.prepare("UPDATE activities SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_registrations'").bind(status,lifecycle[1]).run();
+  if(result.meta?.changes!==1)return bad('Activity already updated',409);
+  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,lifecycle[1],action).run();
+  return json({id:lifecycle[1],status});
+ }
  const match=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})\/decision$/);
  if(match&&method==='POST'){
   if(user.role!=='admin')return bad('Forbidden',403);
