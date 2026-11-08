@@ -31,7 +31,7 @@ export async function handleApi(req,env){
   const activityId=url.searchParams.get('activityId')||'';
   if(!/^[a-f0-9-]{36}$/.test(activityId))return bad('Valid activity ID required');
   const rows=await db.prepare("SELECT s.id,s.starts_at,s.ends_at,s.starts_at_utc,s.ends_at_utc,s.timezone,s.venue,s.min_participants,s.max_participants,s.status,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.activity_id=? AND a.status='pending_registrations' AND s.status='open' AND s.starts_at_utc>? ORDER BY COALESCE(s.starts_at_utc,s.starts_at) ASC LIMIT 50").bind(activityId,new Date().toISOString()).all();
-  const count=await db.prepare('SELECT COUNT(*) AS n FROM trial_sessions WHERE activity_id=? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations')').bind(activityId,activityId).first();
+  const count=await db.prepare("SELECT COUNT(*) AS n FROM trial_sessions WHERE activity_id=? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations')").bind(activityId,activityId).first();
   return json({hasSessions:Number(count.n)>0,sessions:(rows.results||[]).map(s=>({...s,remaining:Math.max(0,s.max_participants-s.interested),minimumReached:s.interested>=s.min_participants}))});
  }
  if(path==='/api/activities'&&method==='GET'){
@@ -71,6 +71,13 @@ export async function handleApi(req,env){
  }
  if(!user)return bad('Unauthenticated',401);
  if(path==='/api/notifications'&&method==='GET'){
+  // A D1 batch is transactional: delivery and acknowledgement commit together.
+  // Repeated GETs cannot duplicate notifications, because the notification id
+  // is deterministically derived from the outbox id.
+  await db.batch([
+   db.prepare("INSERT OR IGNORE INTO notifications(id,user_id,activity_id,kind,title,message,created_at) SELECT substr(id,1,8)||'-'||substr(id,9,4)||'-'||substr(id,13,4)||'-'||substr(id,17,4)||'-'||substr(id,21,12),user_id,activity_id,kind,title,message,created_at FROM session_notification_outbox WHERE user_id=? AND delivered_at IS NULL").bind(user.id),
+   db.prepare("UPDATE session_notification_outbox SET delivered_at=CURRENT_TIMESTAMP WHERE user_id=? AND delivered_at IS NULL").bind(user.id)
+  ]);
   const rows=await db.prepare('SELECT id,kind,title,message,activity_id,read_at,created_at FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 50').bind(user.id).all();
   return json({notifications:rows.results||[]});
  }
@@ -166,9 +173,6 @@ export async function handleApi(req,env){
   if(s.status!=='open')return bad('Only open sessions can be cancelled',409);
   const changed=await db.prepare("UPDATE trial_sessions SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND provider_id=? AND status IN ('pending_approval','pending_registrations'))").bind(cancelSession[1],user.id).run();
   if(changed.meta?.changes!==1)return bad('Session already changed',409);
-  const parents=await db.prepare("SELECT DISTINCT parent_id FROM interests WHERE session_id=? AND status='interested'").bind(cancelSession[1]).all();
-  for(const p of parents.results||[])await notify(db,p.parent_id,s.activity_id,'session_cancelled','Trial session cancelled','The provider cancelled your selected trial session. No payment was collected.');
-  await notify(db,user.id,s.activity_id,'session_cancelled','Session cancelled','Your trial session has been cancelled.');
   return json({id:cancelSession[1],status:'cancelled'});
  }
  const reschedule=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/reschedule$/);
@@ -183,9 +187,6 @@ export async function handleApi(req,env){
   if(session.status!=='open'||!['pending_approval','pending_registrations'].includes(session.activity_status))return bad('Only open sessions can be rescheduled',409);
   const changed=await db.prepare("UPDATE trial_sessions SET starts_at=?,ends_at=?,starts_at_utc=?,ends_at_utc=?,venue=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND provider_id=? AND status IN ('pending_approval','pending_registrations'))").bind(start,end,startUtc,endUtc,venue,reschedule[1],user.id).run();
   if(changed.meta?.changes!==1)return bad('Session changed',409);
-  const parents=await db.prepare("SELECT DISTINCT parent_id FROM interests WHERE session_id=? AND status='interested'").bind(reschedule[1]).all();
-  for(const p of parents.results||[])await notify(db,p.parent_id,session.activity_id,'session_rescheduled','Trial time changed','New Sydney time: '+start+' at '+venue+'. Please review your trial details.');
-  await notify(db,user.id,session.activity_id,'session_rescheduled','Session updated','Sydney time: '+start+' at '+venue);
   return json({id:reschedule[1],startsAt:start,endsAt:end,timezone:'Australia/Sydney'});
  }
  if(path==='/api/provider/activities'&&method==='POST'){
@@ -237,13 +238,11 @@ export async function handleApi(req,env){
   if(decision==='confirm'&&s.interested<s.min_participants)return bad('Minimum not reached',409);
   if(decision==='cancel'&&(s.interested>=s.min_participants||(s.starts_at_utc?s.starts_at_utc>=new Date().toISOString():s.starts_at.slice(0,10)>=utcToSydney(new Date().toISOString()).slice(0,10))))return bad('Cannot cancel before session date or when minimum is reached',409);
   const next=decision==='confirm'?'confirmed':'cancelled';
-  const changed=await db.prepare("UPDATE trial_sessions SET status=? WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND status='pending_registrations') AND ((?='confirmed' AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')>=min_participants) OR (?='cancelled' AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')<min_participants AND (starts_at_utc IS NOT NULL AND starts_at_utc<?)))").bind(next,sessionDecision[1],next,next,new Date().toISOString()).run();
+  const [changed]=await db.batch([
+   db.prepare("UPDATE trial_sessions SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND status='pending_registrations') AND ((?='confirmed' AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')>=min_participants) OR (?='cancelled' AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')<min_participants AND starts_at_utc IS NOT NULL AND starts_at_utc<?))").bind(next,sessionDecision[1],next,next,new Date().toISOString()),
+   db.prepare("INSERT INTO audit_events(id,actor_id,activity_id,action) SELECT ?,?,?,? WHERE changes()=1 AND EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND status=?)").bind(crypto.randomUUID(),user.id,s.activity_id,'session_'+decision,sessionDecision[1],next)
+  ]);
   if(changed.meta?.changes!==1)return bad('Already updated',409);
-  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,s.activity_id,'session_'+decision).run();
-  const parents=await db.prepare("SELECT DISTINCT parent_id FROM interests WHERE session_id=? AND status='interested'").bind(sessionDecision[1]).all();
-  for(const p of parents.results||[])await notify(db,p.parent_id,s.activity_id,'session_status','Trial session '+next,decision==='confirm'?'Minimum interest reached. This is not a confirmed payment or booking.':'This trial session has been cancelled.');
-  const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(s.activity_id).first();
-  if(owner)await notify(db,owner.provider_id,s.activity_id,'session_status','Trial session '+next,'A trial session has been '+next+' by admin.');
   return json({id:sessionDecision[1],status:next});
  }
  const detail=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})$/);

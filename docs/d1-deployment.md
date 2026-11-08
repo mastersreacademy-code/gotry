@@ -72,3 +72,13 @@ The Python script executes **all SQL migration files** against an in-memory SQLi
 **Safety fixes:** Activity Discovery no longer treats aggregate interest across multiple sessions as a single capacity limit. The public sessions endpoint hides unapproved activity session counts. Only sessions with UTC instants are available for new registrations; older records created before migration 0006 must be reviewed/rescheduled to populate UTC. Provider cancellation of open sessions notifies interested parents. Admin decisions recheck minimum numbers atomically.
 
 **Known limitation:** Notifications are written after status changes rather than through a transactional outbox; a failed notification insert can leave the status updated. Real children and payments remain out of scope.
+
+## Migration 0007 — durable session notification outbox
+
+Back up D1 and apply `migrations/0007_session_outbox.sql` **after migrations 0001–0006**. SQLite triggers enqueue one durable event per interested parent and the provider **in the same transaction** as a trial session's status, venue, or schedule change. If the enqueue fails, the session update rolls back.
+
+When an authenticated user opens `GET /api/notifications`, D1 `batch()` copies that user's pending events into notifications and acknowledges them in one transaction. The notification ID is deterministically derived from the outbox event ID; repeated requests cannot duplicate messages. This is **pull-based in-app delivery**, not an email sender or background job. Users receive notifications when they next open the notifications screen. Unread messages are still visible through the existing interface.
+
+Run `python3 tests/outbox_sqlite_smoke.py` and `python3 tests/sqlite_d1_smoke.py` after checkout. These run all migrations on local SQLite, validate trigger delivery, idempotency, per-user isolation, and rollback. They are not full Wrangler D1/Playwright E2E tests.
+
+Remaining work: transactionally link parent interest changes to notifications, confirm production migration on a disposable D1 database, test browser flows end-to-end, implement notification retention and privacy review before using real child data.
