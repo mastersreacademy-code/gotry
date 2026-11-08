@@ -3,6 +3,7 @@ const encoder=new TextEncoder();
 const json=(data,status=200,extra={})=>Response.json(data,{status,headers:{'cache-control':'no-store','x-robots-tag':'noindex, nofollow',...extra}});
 const bad=(message,status=400)=>json({error:message},status);
 const cookieName='gotry_session';
+function publicTrial(d,count=0){const min=d.trialType==='group'?Number(d.minParticipants):1;const max=d.trialType==='group'?Number(d.maxParticipants):1;return {type:d.trialType,date:d.trialDate,time:d.trialTime||'',minParticipants:min,maxParticipants:max,interestCount:count,remaining:Math.max(0,max-count),minimumReached:count>=min};}
 const hex=buffer=>Array.from(new Uint8Array(buffer),x=>x.toString(16).padStart(2,'0')).join('');
 async function sha256(s){return hex(await crypto.subtle.digest('SHA-256',encoder.encode(s)));}
 async function passwordHash(password,salt=crypto.randomUUID()){const key=await crypto.subtle.importKey('raw',encoder.encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:encoder.encode(salt),iterations:210000,hash:'SHA-256'},key,256);return salt+':'+hex(bits);}
@@ -19,8 +20,8 @@ export async function handleApi(req,env){
  if(method!=='GET'&&!req.headers.get('content-type')?.toLowerCase().startsWith('application/json'))return bad('JSON required',415);
  try{
  if(path==='/api/activities'&&method==='GET'){
-  const rows=await db.prepare("SELECT id,title,data_json FROM activities WHERE status='pending_registrations' ORDER BY created_at DESC LIMIT 100").all();
-  return json({activities:(rows.results||[]).map(a=>{const data=JSON.parse(a.data_json);return {id:a.id,title:a.title,category:data.category,description:data.description,location:data.location,minAge:data.minAge,maxAge:data.maxAge};})});
+  const rows=await db.prepare("SELECT a.id,a.title,a.data_json,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.status='pending_registrations' ORDER BY a.created_at DESC LIMIT 100").all();
+  return json({activities:(rows.results||[]).map(a=>{const data=JSON.parse(a.data_json);return {id:a.id,title:a.title,category:data.category,description:data.description,location:data.location,minAge:data.minAge,maxAge:data.maxAge,trial:publicTrial(data,Number(a.interest_count))};})});
  }
  if(path==='/api/auth/register'&&method==='POST'){
   const body=await readBody(req),email=String(body.email||'').trim().toLowerCase(),password=String(body.password||''),role=body.role;
@@ -31,8 +32,17 @@ export async function handleApi(req,env){
  }
  if(path==='/api/auth/login'&&method==='POST'){
   const body=await readBody(req),email=String(body.email||'').trim().toLowerCase(),password=String(body.password||'');
+  if(email.length>254||password.length>128)return bad('Invalid credentials',401);
+  const now=Math.floor(Date.now()/1000),emailHash=await sha256(email);
+  const attempts=await db.prepare('SELECT attempts,window_started,blocked_until FROM auth_attempts WHERE email_hash=?').bind(emailHash).first();
+  if(attempts&&attempts.blocked_until>now)return bad('Too many attempts. Try again later',429);
   const user=await db.prepare('SELECT id,email,role,password_hash FROM users WHERE email=?').bind(email).first();
-  if(!user||!await passwordMatches(password,user.password_hash))return bad('Invalid credentials',401);
+  if(!user||!await passwordMatches(password,user.password_hash)){
+   const within=attempts&&now-attempts.window_started<900,failed=within?attempts.attempts+1:1;
+   await db.prepare('INSERT INTO auth_attempts(email_hash,attempts,window_started,blocked_until) VALUES(?,?,?,?) ON CONFLICT(email_hash) DO UPDATE SET attempts=excluded.attempts,window_started=excluded.window_started,blocked_until=excluded.blocked_until').bind(emailHash,failed,within?attempts.window_started:now,failed>=5?now+900:0).run();
+   return bad('Invalid credentials',401);
+  }
+  await db.prepare('DELETE FROM auth_attempts WHERE email_hash=?').bind(emailHash).run();
   const token=hex(crypto.getRandomValues(new Uint8Array(32))),hash=await sha256(token),expiry=Math.floor(Date.now()/1000)+86400;
   await db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(hash,user.id,expiry).run();
   return json({user:{id:user.id,email:user.email,role:user.role}},200,{'set-cookie':sessionCookie(token,86400)});
@@ -57,11 +67,14 @@ export async function handleApi(req,env){
   const activity=await db.prepare("SELECT data_json FROM activities WHERE id=? AND status='pending_registrations'").bind(activityId).first();
   if(!activity)return bad('Activity is not accepting interest',404);
   const details=JSON.parse(activity.data_json);
+  const capacity=details.trialType==='group'?Number(details.maxParticipants):1;
+  if(!Number.isInteger(capacity)||capacity<1)return bad('Activity capacity is invalid',422);
   if(childAge<Number(details.minAge)||childAge>Number(details.maxAge))return bad('Age is outside the activity range',422);
   const existing=await db.prepare('SELECT id,status FROM interests WHERE activity_id=? AND parent_id=? AND child_name=?').bind(activityId,user.id,childName).first();
-  if(existing){if(existing.status==='interested')return bad('Interest already registered',409);await db.prepare("UPDATE interests SET status='interested',child_age=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(childAge,existing.id).run();return json({id:existing.id,status:'interested'});}
+  if(existing){if(existing.status==='interested')return bad('Interest already registered',409);const result=await db.prepare("UPDATE interests SET status='interested',child_age=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested') < ?").bind(childAge,existing.id,activityId,capacity).run();if(result.meta?.changes!==1)return bad('Trial is full',409);return json({id:existing.id,status:'interested'});}
   const id=crypto.randomUUID();
-  await db.prepare('INSERT INTO interests(id,activity_id,parent_id,child_name,child_age) VALUES(?,?,?,?,?)').bind(id,activityId,user.id,childName,childAge).run();
+  const result=await db.prepare("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested') < ? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations')").bind(id,activityId,user.id,childName,childAge,activityId,capacity,activityId).run();
+  if(result.meta?.changes!==1)return bad('Trial is full or unavailable',409);
   return json({id,status:'interested'},201);
  }
  const withdraw=path.match(/^\/api\/parent\/interests\/([a-f0-9-]{36})\/withdraw$/);
@@ -82,13 +95,26 @@ export async function handleApi(req,env){
  }
  if(path==='/api/provider/activities'&&method==='GET'){
   if(user.role!=='provider')return bad('Forbidden',403);
-  const rows=await db.prepare('SELECT a.id,a.title,a.status,a.admin_note,a.created_at,a.updated_at,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.provider_id=? ORDER BY a.created_at DESC LIMIT 100').bind(user.id).all();
-  return json({activities:rows.results});
+  const rows=await db.prepare("SELECT a.id,a.title,a.status,a.admin_note,a.data_json,a.created_at,a.updated_at,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.provider_id=? ORDER BY a.created_at DESC LIMIT 100").bind(user.id).all();
+  return json({activities:(rows.results||[]).map(({data_json,...row})=>({...row,trial:publicTrial(JSON.parse(data_json),Number(row.interest_count))}))});
+ }
+ const cancel=path.match(/^\/api\/provider\/activities\/([a-f0-9-]{36})\/cancel$/);
+ if(cancel&&method==='POST'){
+  if(user.role!=='provider')return bad('Forbidden',403);
+  const result=await db.prepare("UPDATE activities SET status='cancelled_by_provider',updated_at=CURRENT_TIMESTAMP WHERE id=? AND provider_id=? AND status IN ('pending_approval','pending_registrations')").bind(cancel[1],user.id).run();
+  if(result.meta?.changes!==1)return bad('Activity unavailable or cannot be cancelled',409);
+  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,cancel[1],'cancel_by_provider').run();
+  return json({id:cancel[1],status:'cancelled_by_provider'});
  }
  if(path==='/api/admin/activities'&&method==='GET'){
   if(user.role!=='admin')return bad('Forbidden',403);
   const rows=await db.prepare("SELECT id,title,status,created_at FROM activities WHERE status='pending_approval' ORDER BY created_at ASC LIMIT 100").all();
   return json({activities:rows.results});
+ }
+ if(path==='/api/admin/trials'&&method==='GET'){
+  if(user.role!=='admin')return bad('Forbidden',403);
+  const rows=await db.prepare("SELECT a.id,a.title,a.status,a.data_json,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.status='pending_registrations' ORDER BY a.created_at ASC LIMIT 100").all();
+  return json({trials:(rows.results||[]).map(({data_json,...a})=>({...a,trial:publicTrial(JSON.parse(data_json),Number(a.interest_count))}))});
  }
  const detail=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})$/);
  if(detail&&method==='GET'){
@@ -96,6 +122,25 @@ export async function handleApi(req,env){
   const activity=await db.prepare('SELECT id,title,status,data_json,admin_note,created_at FROM activities WHERE id=?').bind(detail[1]).first();
   if(!activity)return bad('Not found',404);
   return json({activity:{id:activity.id,title:activity.title,status:activity.status,details:JSON.parse(activity.data_json),adminNote:activity.admin_note,createdAt:activity.created_at}});
+ }
+ const lifecycle=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})\/lifecycle$/);
+ if(lifecycle&&method==='POST'){
+  if(user.role!=='admin')return bad('Forbidden',403);
+  const body=await readBody(req),action=String(body.action||'');
+  if(!['confirm_minimum','cancel_low_numbers'].includes(action))return bad('Invalid lifecycle action');
+  const activity=await db.prepare("SELECT data_json,status FROM activities WHERE id=?").bind(lifecycle[1]).first();
+  if(!activity||activity.status!=='pending_registrations')return bad('Activity is not awaiting registrations',409);
+  const details=JSON.parse(activity.data_json);
+  const count=await db.prepare("SELECT COUNT(*) AS total FROM interests WHERE activity_id=? AND status='interested'").bind(lifecycle[1]).first();
+  const minimum=details.trialType==='group'?Number(details.minParticipants):1;
+  if(action==='confirm_minimum'&&Number(count.total)<minimum)return bad('Minimum participants not reached',409);
+  if(action==='cancel_low_numbers'&&Number(count.total)>=minimum)return bad('Minimum already reached',409);
+  if(action==='cancel_low_numbers'){const deadline=details.deadline||details.trialDate;if(!/^\d{4}-\d{2}-\d{2}$/.test(deadline)||deadline>=new Date().toISOString().slice(0,10))return bad('Registration deadline has not passed',409);}
+  const status=action==='confirm_minimum'?'proceeding_pending_payments':'cancelled_low_numbers';
+  const result=await db.prepare("UPDATE activities SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_registrations'").bind(status,lifecycle[1]).run();
+  if(result.meta?.changes!==1)return bad('Activity already updated',409);
+  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,lifecycle[1],action).run();
+  return json({id:lifecycle[1],status});
  }
  const match=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})\/decision$/);
  if(match&&method==='POST'){
