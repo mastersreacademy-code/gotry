@@ -158,6 +158,19 @@ export async function handleApi(req,env){
   const rows=await db.prepare("SELECT i.id,i.child_name,i.child_age,i.status,i.created_at FROM interests i WHERE i.session_id=? AND i.status='interested' ORDER BY i.created_at ASC LIMIT 100").bind(roster[1]).all();
   return json({roster:rows.results||[]});
  }
+ const cancelSession=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/cancel$/);
+ if(cancelSession&&method==='POST'){
+  if(user.role!=='provider')return bad('Forbidden',403);
+  const s=await db.prepare("SELECT s.activity_id,s.status FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=? AND a.status IN ('pending_approval','pending_registrations')").bind(cancelSession[1],user.id).first();
+  if(!s)return bad('Not found',404);
+  if(s.status!=='open')return bad('Only open sessions can be cancelled',409);
+  const changed=await db.prepare("UPDATE trial_sessions SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND provider_id=? AND status IN ('pending_approval','pending_registrations'))").bind(cancelSession[1],user.id).run();
+  if(changed.meta?.changes!==1)return bad('Session already changed',409);
+  const parents=await db.prepare("SELECT DISTINCT parent_id FROM interests WHERE session_id=? AND status='interested'").bind(cancelSession[1]).all();
+  for(const p of parents.results||[])await notify(db,p.parent_id,s.activity_id,'session_cancelled','Trial session cancelled','The provider cancelled your selected trial session. No payment was collected.');
+  await notify(db,user.id,s.activity_id,'session_cancelled','Session cancelled','Your trial session has been cancelled.');
+  return json({id:cancelSession[1],status:'cancelled'});
+ }
  const reschedule=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/reschedule$/);
  if(reschedule&&method==='POST'){
   if(user.role!=='provider')return bad('Forbidden',403);
