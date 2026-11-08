@@ -35,8 +35,8 @@ export async function handleApi(req,env){
   return json({hasSessions:Number(count.n)>0,sessions:(rows.results||[]).map(s=>({...s,remaining:Math.max(0,s.max_participants-s.interested),minimumReached:s.interested>=s.min_participants}))});
  }
  if(path==='/api/activities'&&method==='GET'){
-  const rows=await db.prepare("SELECT a.id,a.title,a.data_json,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.status='pending_registrations' ORDER BY a.created_at DESC LIMIT 100").all();
-  return json({activities:(rows.results||[]).map(a=>{const data=JSON.parse(a.data_json);return {id:a.id,title:a.title,category:data.category,description:data.description,location:data.location,minAge:data.minAge,maxAge:data.maxAge,trial:publicTrial(data,Number(a.interest_count))};})});
+  const rows=await db.prepare("SELECT a.id,a.title,a.data_json,(SELECT COUNT(*) FROM trial_sessions s WHERE s.activity_id=a.id) AS session_count,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.status='pending_registrations' ORDER BY a.created_at DESC LIMIT 100").all();
+  return json({activities:(rows.results||[]).map(a=>{const data=JSON.parse(a.data_json);return {id:a.id,title:a.title,category:data.category,description:data.description,location:data.location,minAge:data.minAge,maxAge:data.maxAge,trial:publicTrial(data,Number(a.interest_count)),hasSessions:Number(a.session_count)>0};})});
  }
  if(path==='/api/auth/register'&&method==='POST'){
   const body=await readBody(req),email=String(body.email||'').trim().toLowerCase(),password=String(body.password||''),role=body.role;
