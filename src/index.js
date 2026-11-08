@@ -1,9 +1,10 @@
 import { page } from './page.js';
+import { wizardPage } from './wizard-page.js';
 export default {
   async fetch(request) {
     const { pathname } = new URL(request.url);
     if (pathname === '/health') return Response.json({ app: 'gotry', status: 'ok', version: '0.1.0' }, { headers: { 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' } });
-    if (pathname === '/' && request.method === 'GET') return new Response(page, { headers: {
+    if ((pathname === '/' || pathname === '/provider/new') && request.method === 'GET') return new Response(pathname === '/' ? page : wizardPage, { headers: {
       'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
       'x-robots-tag': 'noindex, nofollow', 'x-content-type-options': 'nosniff',
       'x-frame-options': 'DENY', 'referrer-policy': 'strict-origin-when-cross-origin',
