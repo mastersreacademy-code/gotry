@@ -85,9 +85,11 @@ export async function handleApi(req,env){
   const details=JSON.parse(activity.data_json);
   const capacity=details.trialType==='group'?Number(details.maxParticipants):1;
   if(!Number.isInteger(capacity)||capacity<1)return bad('Activity capacity is invalid',422);
+  const deadline=details.deadline||details.trialDate;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(deadline)||deadline<new Date().toISOString().slice(0,10))return bad('Registration deadline has passed',409);
   if(childAge<Number(details.minAge)||childAge>Number(details.maxAge))return bad('Age is outside the activity range',422);
   const existing=await db.prepare('SELECT id,status FROM interests WHERE activity_id=? AND parent_id=? AND child_name=?').bind(activityId,user.id,childName).first();
-  if(existing){if(existing.status==='interested')return bad('Interest already registered',409);const result=await db.prepare("UPDATE interests SET status='interested',child_age=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested') < ?").bind(childAge,existing.id,activityId,capacity).run();if(result.meta?.changes!==1)return bad('Trial is full',409);await notify(db,user.id,activityId,'interest_registered','Interest restored','Your interest is active again. This is not a confirmed booking.');return json({id:existing.id,status:'interested'});}
+  if(existing){if(existing.status==='interested')return bad('Interest already registered',409);const result=await db.prepare("UPDATE interests SET status='interested',child_age=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations') AND (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested') < ?").bind(childAge,existing.id,activityId,activityId,capacity).run();if(result.meta?.changes!==1)return bad('Trial is full',409);await notify(db,user.id,activityId,'interest_registered','Interest restored','Your interest is active again. This is not a confirmed booking.');return json({id:existing.id,status:'interested'});}
   const id=crypto.randomUUID();
   const result=await db.prepare("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested') < ? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations')").bind(id,activityId,user.id,childName,childAge,activityId,capacity,activityId).run();
   if(result.meta?.changes!==1)return bad('Trial is full or unavailable',409);
@@ -154,6 +156,7 @@ export async function handleApi(req,env){
   const count=await db.prepare("SELECT COUNT(*) AS total FROM interests WHERE activity_id=? AND status='interested'").bind(lifecycle[1]).first();
   const minimum=details.trialType==='group'?Number(details.minParticipants):1;
   if(action==='confirm_minimum'&&Number(count.total)<minimum)return bad('Minimum participants not reached',409);
+  if(action==='confirm_minimum'&&Number(count.total)>Number(details.trialType==='group'?details.maxParticipants:1))return bad('Trial capacity exceeded',409);
   if(action==='cancel_low_numbers'&&Number(count.total)>=minimum)return bad('Minimum already reached',409);
   if(action==='cancel_low_numbers'){const deadline=details.deadline||details.trialDate;if(!/^\d{4}-\d{2}-\d{2}$/.test(deadline)||deadline>=new Date().toISOString().slice(0,10))return bad('Registration deadline has not passed',409);}
   const status=action==='confirm_minimum'?'proceeding_pending_payments':'cancelled_low_numbers';
