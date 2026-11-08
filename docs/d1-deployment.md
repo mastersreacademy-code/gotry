@@ -104,3 +104,20 @@ Run `python3 tests/session_capacity_sqlite_smoke.py` and existing SQLite suites;
 The original 0008 table rebuild conflicted with `session_parent_outbox` from 0007: SQLite validates the trigger's reference to `interests` while renaming the replacement table, after the original table was dropped. Migration 0008 now temporarily drops **only** that trigger and recreates its original definition after the table rename. A representative SQLite migration test reproduced the failure and confirmed the corrected sequence. The full repository Wrangler D1 migration chain still requires execution.
 
 **If 0008 has already been applied to a database, do not blindly rerun it.** Check `PRAGMA table_info(interests)`, `SELECT name FROM sqlite_master WHERE type='trigger'`, and the migration history, and reconcile with a backup before applying 0009.
+
+## Session state and concurrent-registration regression checks
+
+Run these from a full local checkout before deployment:
+
+```sh
+npm run check
+python3 tests/session_capacity_sqlite_smoke.py
+python3 tests/session_concurrency_sqlite.py
+python3 tests/multi_session_sqlite_smoke.py
+python3 tests/outbox_sqlite_smoke.py
+npx wrangler d1 migrations apply gotry-ci --local --config wrangler.ci.jsonc
+```
+
+The concurrent SQLite WAL test uses six simultaneous connections to compete for two seats and asserts exactly two accepted writes, then exercises transfer and notification outbox. This is an **additional regression test**, not proof of Wrangler D1 production concurrency. The API now disallows transferring or withdrawing an interest from a confirmed/cancelled session, including a second status check within the SQL UPDATE. The Parent Dashboard hides the actions for locked sessions. Legacy unassigned interests cannot be transferred until migrated explicitly.
+
+Protect real children: only use pseudonymous child labels in testing; do not enter actual child names, birthdates, or contact details. Full end-to-end provider/admin/parent browser and real Wrangler D1 tests still require a local checkout and are not automatically executed by this PR.
