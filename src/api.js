@@ -1,4 +1,5 @@
 import {validateStep,safeDraft} from './wizard.js';
+import {sydneyToUtc,utcToSydney} from './sydney-time.js';
 const encoder=new TextEncoder();
 const json=(data,status=200,extra={})=>Response.json(data,{status,headers:{'cache-control':'no-store','x-robots-tag':'noindex, nofollow',...extra}});
 const bad=(message,status=400)=>json({error:message},status);
@@ -29,7 +30,7 @@ export async function handleApi(req,env){
  if(path==='/api/trial-sessions'&&method==='GET'){
   const activityId=url.searchParams.get('activityId')||'';
   if(!/^[a-f0-9-]{36}$/.test(activityId))return bad('Valid activity ID required');
-  const rows=await db.prepare("SELECT s.id,s.starts_at,s.ends_at,s.venue,s.min_participants,s.max_participants,s.status,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.activity_id=? AND a.status='pending_registrations' AND s.status='open' ORDER BY s.starts_at ASC LIMIT 50").bind(activityId).all();
+  const rows=await db.prepare("SELECT s.id,s.starts_at,s.ends_at,s.starts_at_utc,s.ends_at_utc,s.timezone,s.venue,s.min_participants,s.max_participants,s.status,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.activity_id=? AND a.status='pending_registrations' AND s.status='open' ORDER BY COALESCE(s.starts_at_utc,s.starts_at) ASC LIMIT 50").bind(activityId).all();
   const count=await db.prepare('SELECT COUNT(*) AS n FROM trial_sessions WHERE activity_id=?').bind(activityId).first();
   return json({hasSessions:Number(count.n)>0,sessions:(rows.results||[]).map(s=>({...s,remaining:Math.max(0,s.max_participants-s.interested),minimumReached:s.interested>=s.min_participants}))});
  }
@@ -95,8 +96,8 @@ export async function handleApi(req,env){
   let session=null;
   if(sessionId){
    if(!/^[a-f0-9-]{36}$/.test(sessionId))return bad('Invalid session ID',422);
-   session=await db.prepare("SELECT id,starts_at,max_participants,status FROM trial_sessions WHERE id=? AND activity_id=?").bind(sessionId,activityId).first();
-   if(!session||session.status!=='open'||session.starts_at<=new Date().toISOString().slice(0,16))return bad('Session unavailable',409);
+   session=await db.prepare("SELECT id,starts_at,starts_at_utc,max_participants,status FROM trial_sessions WHERE id=? AND activity_id=?").bind(sessionId,activityId).first();
+   if(!session||session.status!=='open'||(session.starts_at_utc?session.starts_at_utc<=new Date().toISOString():session.starts_at<=utcToSydney(new Date().toISOString())))return bad('Session unavailable',409);
    capacity=Number(session.max_participants);
   }else{
    const slots=await db.prepare('SELECT COUNT(*) AS n FROM trial_sessions WHERE activity_id=?').bind(activityId).first();
@@ -132,17 +133,20 @@ export async function handleApi(req,env){
  const providerSessions=path.match(/^\/api\/provider\/activities\/([a-f0-9-]{36})\/sessions$/);
  if(providerSessions&&method==='GET'){
   if(user.role!=='provider')return bad('Forbidden',403);
-  const rows=await db.prepare("SELECT s.id,s.starts_at,s.ends_at,s.venue,s.min_participants,s.max_participants,s.status,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE a.provider_id=? AND a.id=? ORDER BY s.starts_at ASC LIMIT 50").bind(user.id,providerSessions[1]).all();
+  const rows=await db.prepare("SELECT s.id,s.starts_at,s.ends_at,s.starts_at_utc,s.ends_at_utc,s.timezone,s.venue,s.min_participants,s.max_participants,s.status,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE a.provider_id=? AND a.id=? ORDER BY s.starts_at ASC LIMIT 50").bind(user.id,providerSessions[1]).all();
   return json({sessions:rows.results||[]});
  }
  if(providerSessions&&method==='POST'){
   if(user.role!=='provider')return bad('Forbidden',403);
   const b=await readBody(req),startsAt=String(b.startsAt||''),endsAt=String(b.endsAt||''),venue=String(b.venue||'').trim(),min=Number(b.minParticipants),max=Number(b.maxParticipants);
-  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(startsAt)||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(endsAt)||!Number.isFinite(Date.parse(startsAt))||!Number.isFinite(Date.parse(endsAt))||startsAt>=endsAt||startsAt<=new Date().toISOString().slice(0,16)||venue.length<2||venue.length>160||!Number.isInteger(min)||!Number.isInteger(max)||min<1||max<min||max>100)return bad('Valid future session, venue and capacity required',422);
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(startsAt)||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(endsAt)||!Number.isFinite(Date.parse(startsAt))||!Number.isFinite(Date.parse(endsAt))||startsAt>=endsAt||startsAt<=utcToSydney(new Date().toISOString())||venue.length<2||venue.length>160||!Number.isInteger(min)||!Number.isInteger(max)||min<1||max<min||max>100)return bad('Valid future session, venue and capacity required',422);
+  let startUtc,endUtc;
+  try{startUtc=sydneyToUtc(startsAt);endUtc=sydneyToUtc(endsAt);}catch(e){return bad(e.message,422);}
+  if(startUtc>=endUtc||startUtc<=new Date().toISOString())return bad('Session must be in the future',422);
   const activity=await db.prepare("SELECT id FROM activities WHERE id=? AND provider_id=? AND status='pending_approval'").bind(providerSessions[1],user.id).first();
   if(!activity)return bad('Only your pending-approval activities can add sessions',403);
   const id=crypto.randomUUID();
-  await db.prepare("INSERT INTO trial_sessions(id,activity_id,starts_at,ends_at,venue,min_participants,max_participants) VALUES(?,?,?,?,?,?,?)").bind(id,providerSessions[1],startsAt,endsAt,venue,min,max).run();
+  await db.prepare("INSERT INTO trial_sessions(id,activity_id,starts_at,ends_at,venue,min_participants,max_participants,starts_at_utc,ends_at_utc) VALUES(?,?,?,?,?,?,?,?,?)").bind(id,providerSessions[1],startsAt,endsAt,venue,min,max,startUtc,endUtc).run();
   await notify(db,user.id,providerSessions[1],'session_created','Trial session scheduled','A new trial session was added to your pending activity.');
   return json({id,status:'open'},201);
  }
@@ -182,7 +186,7 @@ export async function handleApi(req,env){
  }
  if(path==='/api/admin/sessions'&&method==='GET'){
   if(user.role!=='admin')return bad('Forbidden',403);
-  const rows=await db.prepare("SELECT s.id,s.activity_id,s.starts_at,s.ends_at,s.venue,s.min_participants,s.max_participants,s.status,a.title,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE a.status='pending_registrations' ORDER BY s.starts_at ASC LIMIT 100").all();
+  const rows=await db.prepare("SELECT s.id,s.activity_id,s.starts_at,s.ends_at,s.starts_at_utc,s.ends_at_utc,s.timezone,s.venue,s.min_participants,s.max_participants,s.status,a.title,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE a.status='pending_registrations' ORDER BY s.starts_at ASC LIMIT 100").all();
   return json({sessions:rows.results||[]});
  }
  const sessionDecision=path.match(/^\/api\/admin\/sessions\/([a-f0-9-]{36})\/decision$/);
