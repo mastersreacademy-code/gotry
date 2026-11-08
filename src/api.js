@@ -102,6 +102,11 @@ export async function handleApi(req,env){
   const rows=await db.prepare("SELECT id,title,status,created_at FROM activities WHERE status='pending_approval' ORDER BY created_at ASC LIMIT 100").all();
   return json({activities:rows.results});
  }
+ if(path==='/api/admin/trials'&&method==='GET'){
+  if(user.role!=='admin')return bad('Forbidden',403);
+  const rows=await db.prepare("SELECT a.id,a.title,a.status,a.data_json,(SELECT COUNT(*) FROM interests i WHERE i.activity_id=a.id AND i.status='interested') AS interest_count FROM activities a WHERE a.status='pending_registrations' ORDER BY a.created_at ASC LIMIT 100").all();
+  return json({trials:(rows.results||[]).map(({data_json,...a})=>({...a,trial:publicTrial(JSON.parse(data_json),Number(a.interest_count))}))});
+ }
  const detail=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})$/);
  if(detail&&method==='GET'){
   if(user.role!=='admin')return bad('Forbidden',403);
