@@ -40,4 +40,12 @@ with db:
     db.execute(deliver,("other",))
     db.execute(ack,("other",))
 assert db.execute("SELECT COUNT(*) FROM notifications WHERE user_id='other'").fetchone()[0]==0
-print("PASS: all migrations, trigger atomic enqueue, no duplicate on repeat, recipient isolation, reschedule")
+# A trigger failure must roll back the status update as well.
+db.execute("CREATE TRIGGER reject_outbox BEFORE INSERT ON session_notification_outbox BEGIN SELECT RAISE(ABORT,'outbox unavailable'); END")
+try:
+    db.execute("UPDATE trial_sessions SET status='cancelled' WHERE id='slot'")
+    raise AssertionError("Expected transactional rollback")
+except sqlite3.IntegrityError:
+    pass
+assert db.execute("SELECT status FROM trial_sessions WHERE id='slot'").fetchone()[0]=="confirmed"
+print("PASS: all migrations, atomic trigger rollback, no duplicate delivery, recipient isolation, reschedule")
