@@ -90,6 +90,13 @@ export async function handleApi(req,env){
   const rows=await db.prepare("SELECT id,title,status,created_at FROM activities WHERE status='pending_approval' ORDER BY created_at ASC LIMIT 100").all();
   return json({activities:rows.results});
  }
+ const detail=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})$/);
+ if(detail&&method==='GET'){
+  if(user.role!=='admin')return bad('Forbidden',403);
+  const activity=await db.prepare('SELECT id,title,status,data_json,admin_note,created_at FROM activities WHERE id=?').bind(detail[1]).first();
+  if(!activity)return bad('Not found',404);
+  return json({activity:{id:activity.id,title:activity.title,status:activity.status,details:JSON.parse(activity.data_json),adminNote:activity.admin_note,createdAt:activity.created_at}});
+ }
  const match=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})\/decision$/);
  if(match&&method==='POST'){
   if(user.role!=='admin')return bad('Forbidden',403);
