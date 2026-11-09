@@ -39,5 +39,17 @@ try:
     raise AssertionError('Restored into cancelled session')
 except sqlite3.IntegrityError:
     pass
-assert db.execute("SELECT COUNT(*) FROM session_notification_outbox").fetchone()[0]>0
+# Outbox events are written only for actual state changes.
+outbox_before=db.execute("SELECT COUNT(*) FROM session_notification_outbox").fetchone()[0]
+assert outbox_before>0
+db.execute("UPDATE trial_sessions SET status='cancelled' WHERE id='a'")
+assert db.execute("SELECT COUNT(*) FROM session_notification_outbox").fetchone()[0]==outbox_before
+# Capacity is freed by withdrawal, and a cancelled session remains unavailable.
+assert db.execute("SELECT COUNT(*) FROM interests WHERE session_id='a' AND status='interested'").fetchone()[0]==2
+# Duplicate active child in a different session is rejected by migration 0010.
+try:
+    add('duplicate','b','Child 4')
+    raise AssertionError('Duplicate active child accepted')
+except sqlite3.IntegrityError:
+    pass
 print('PASS: all migrations, per-session capacity, transfer, withdrawal, cancelled-session rejection, outbox')
