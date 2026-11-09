@@ -17,3 +17,9 @@ All eight pages now render the same `siteFooter` and the final `siteRefinements`
 When adding a page, import `siteCss`, `siteHeader`, `siteFooter` and `siteRefinements` from `src/site-design.js`. Append refinements **after** local page CSS and render the shared footer once, before `</body>`. The regression in `tests/site-design.test.js` now checks the shared footer and responsive stylesheet across all eight pages.
 
 Manual visual QA is still required on desktop and mobile: compare header wrapping, cards, dialog focus, disabled actions, narrow input grids and footer placement. The assistant validated generated HTML and inline JavaScript syntax but did not execute Playwright or Wrangler.
+
+## Mobile/desktop browser regression
+
+Run `npx playwright test e2e/site-visual-consistency.spec.js` on a local checkout with Wrangler, Playwright and Chromium installed. The spec covers all eight pages at the existing desktop and iPhone 13 project sizes: shared header/footer, noindex, brand colour, focusability, and horizontal overflow. It also opens and closes the Explore registration dialog and checks viewport bounds.
+
+Nested session forms must **not** inherit the standalone card surface styles; the common CSS now restricts that surface treatment to cards and panels. Modal dialogs have capped viewport height, scrolling and responsive input sizing. The Playwright test was authored but not executed in the assistant environment because a runnable Wrangler project checkout was unavailable. The eight template/inline-script syntax checks did execute and passed.
