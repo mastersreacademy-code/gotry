@@ -45,6 +45,30 @@ class OutboxIdentityTests(unittest.TestCase):
         self.assertIsNotNone(self.db.execute("SELECT delivered_at FROM session_notification_outbox WHERE user_id='other'").fetchone()[0])
         self.assertIsNone(self.db.execute("SELECT delivered_at FROM session_notification_outbox WHERE user_id='parent'").fetchone()[0])
 
+    def test_collision_recovers_without_cross_user_leak(self):
+        # Legacy notification already owns the deterministic UUID for an unrelated recipient.
+        self.db.execute('UPDATE notifications SET outbox_id=NULL WHERE id=?', (LEGACY_ID,))
+        self.db.execute('UPDATE notifications SET user_id=? WHERE id=?', ('other', LEGACY_ID))
+        self.db.execute('''INSERT OR IGNORE INTO notifications(id,user_id,activity_id,kind,title,message,created_at,outbox_id)
+            SELECT 'recovered-id',user_id,activity_id,kind,title,message,created_at,id
+            FROM session_notification_outbox WHERE user_id=? AND delivered_at IS NULL''', ('parent',))
+        self.assertEqual(self.db.execute("SELECT user_id FROM notifications WHERE id='recovered-id'").fetchone()[0], 'parent')
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM notifications WHERE outbox_id=?", (OUTBOX_ID,)).fetchone()[0], 1)
+        self.db.execute('''INSERT OR IGNORE INTO notifications(id,user_id,activity_id,kind,title,message,created_at,outbox_id)
+            SELECT 'another-id',user_id,activity_id,kind,title,message,created_at,id
+            FROM session_notification_outbox WHERE user_id=? AND delivered_at IS NULL''', ('parent',))
+        self.assertEqual(self.db.execute("SELECT COUNT(*) FROM notifications WHERE outbox_id=?", (OUTBOX_ID,)).fetchone()[0], 1)
+
+    def test_mismatched_payload_does_not_acknowledge(self):
+        self.db.execute('UPDATE notifications SET message=? WHERE id=?', ('Changed', LEGACY_ID))
+        self.db.execute('''UPDATE session_notification_outbox SET delivered_at=CURRENT_TIMESTAMP
+            WHERE user_id=? AND delivered_at IS NULL AND EXISTS (
+              SELECT 1 FROM notifications n WHERE n.outbox_id=session_notification_outbox.id
+              AND n.user_id=session_notification_outbox.user_id AND n.activity_id=session_notification_outbox.activity_id
+              AND n.kind=session_notification_outbox.kind AND n.title=session_notification_outbox.title
+              AND n.message=session_notification_outbox.message AND n.created_at=session_notification_outbox.created_at)''', ('parent',))
+        self.assertIsNone(self.db.execute('SELECT delivered_at FROM session_notification_outbox WHERE id=?', (OUTBOX_ID,)).fetchone()[0])
+
     def test_transaction_rollback(self):
         with self.assertRaises(sqlite3.IntegrityError):
             with self.db:
