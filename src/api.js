@@ -84,7 +84,10 @@ export async function handleApi(req,env){
  const readNotice=path.match(/^\/api\/notifications\/([a-f0-9-]{36})\/read$/);
  if(readNotice&&method==='POST'){
   const result=await db.prepare('UPDATE notifications SET read_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=? AND read_at IS NULL').bind(readNotice[1],user.id).run();
-  if(result.meta?.changes!==1)return bad('Notification unavailable or already read',404);
+  if(result.meta?.changes!==1){
+   const existing=await db.prepare('SELECT id FROM notifications WHERE id=? AND user_id=?').bind(readNotice[1],user.id).first();
+   if(!existing)return bad('Notification unavailable',404);
+  }
   return json({ok:true});
  }
  if(path==='/api/parent/interests'&&method==='GET'){
@@ -180,11 +183,13 @@ export async function handleApi(req,env){
   if(user.role!=='provider')return bad('Forbidden',403);
   const owned=await db.prepare('SELECT s.id,s.status,a.status AS activity_status FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=?').bind(roster[1],user.id).first();
   if(!owned)return bad('Not found',404);
-  const count=await db.prepare("SELECT COUNT(*) AS n FROM interests WHERE session_id=? AND status='interested'").bind(roster[1]).first();
-  const namesAvailable=owned.status==='confirmed'&&!owned.activity_status.startsWith('cancelled');
-  if(!namesAvailable)return json({roster:[],count:Number(count.n),namesAvailable:false});
-  const rows=await db.prepare("SELECT child_name FROM interests WHERE session_id=? AND status='interested' ORDER BY created_at ASC LIMIT 100").bind(roster[1]).all();
-  return json({roster:rows.results||[],count:Number(count.n),namesAvailable:true});
+  // Both count and names are read from one SQL snapshot. Names are gated in
+  // SQL, so a stale dashboard cannot request names for an unconfirmed session.
+  const rows=await db.prepare("SELECT CASE WHEN s.status='confirmed' AND a.status NOT LIKE 'cancelled%' THEN i.child_name ELSE NULL END AS child_name, (SELECT COUNT(*) FROM interests all_i WHERE all_i.session_id=s.id AND all_i.status='interested') AS total, CASE WHEN s.status='confirmed' AND a.status NOT LIKE 'cancelled%' THEN 1 ELSE 0 END AS names_available FROM trial_sessions s JOIN activities a ON a.id=s.activity_id LEFT JOIN interests i ON i.session_id=s.id AND i.status='interested' WHERE s.id=? AND a.provider_id=? ORDER BY i.created_at ASC LIMIT 100").bind(roster[1],user.id).all();
+  const result=rows.results||[];
+  if(!result.length)return bad('Not found',404);
+  const namesAvailable=Boolean(result[0].names_available);
+  return json({roster:namesAvailable?result.filter(x=>x.child_name!==null).map(x=>({child_name:x.child_name})):[],count:Number(result[0].total),namesAvailable});
  }
  const cancelSession=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/cancel$/);
  if(cancelSession&&method==='POST'){
