@@ -5,13 +5,13 @@ import {providerDashboard,parentDashboard} from '../src/dashboard-pages.js';
 import {adminPage} from '../src/admin-page.js';
 const api=readFileSync(new URL('../src/api.js',import.meta.url),'utf8');
 test('provider cancellation binds the UTC cutoff before owner ID',()=>{
- assert.match(api,/bind\(cancelSession\[1\],new Date\(\)\.toISOString\(\),user\.id\)\.run\(\)/);
+ assert.match(api,/bind\(cancelSession\[1\],expectedStartsAt,new Date\(\)\.toISOString\(\),user\.id\)\.run\(\)/);
 });
 test('parent transfer and withdrawal reject expired source sessions atomically',()=>{
  assert.match(api,/old\.status='open' AND old\.starts_at_utc>\?/);
- assert.match(api,/bind\(target,transfer\[1\],user\.id,target,target,now,today,today,now\)\.run\(\)/);
+ assert.match(api,/bind\(target,transfer\[1\],user\.id,interest\.session_id,target,target,now,today,today,now\)\.run\(\)/);
  assert.match(api,/s\.status='open' AND s\.starts_at_utc>\?/);
- assert.match(api,/bind\(withdraw\[1\],user\.id,new Date\(\)\.toISOString\(\)\)\.run\(\)/);
+ assert.match(api,/bind\(withdraw\[1\],user\.id,expectedSessionId,new Date\(\)\.toISOString\(\)\)\.run\(\)/);
 });
 test('parent and provider dashboards provide distinct state filters',()=>{
  assert.ok(providerDashboard.includes('All activities'));
