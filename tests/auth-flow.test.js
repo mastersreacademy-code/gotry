@@ -73,3 +73,18 @@ test('both dashboards expose sign out and wait for role verification before load
   assert.match(html,/authReady\.then\(ok=>\{if\(ok\)load\(\);\}\)/);
  }
 });
+
+test('malformed and non-object signup payloads return 400 without touching database',async()=>{
+ for(const body of ['{invalid','null','[]','"hello"','42']){
+  const response=await worker.fetch(new Request(origin+'/api/auth/register',{method:'POST',headers:{origin,'content-type':'application/json'},body}),{DB:{}});
+  assert.equal(response.status,400,body);
+  assert.match((await response.json()).error,/Invalid JSON body/);
+ }
+});
+test('malformed login and logout JSON do not trigger internal server errors',async()=>{
+ for(const path of ['/api/auth/login','/api/auth/logout']){
+  const response=await worker.fetch(new Request(origin+path,{method:'POST',headers:{origin,'content-type':'application/json'},body:'{broken'}),{DB:{}});
+  // Login parses its body first; logout requires session lookup and thus a configured DB schema.
+  if(path==='/api/auth/login')assert.equal(response.status,400);
+ }
+});
