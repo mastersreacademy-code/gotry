@@ -35,3 +35,27 @@ Browser regression coverage includes mocked API success/empty/error and no-match
 Local execution environment check (2026-11-09): Node.js 22.16.0 and Python Playwright are available, but the GoTry repository cannot be cloned because GitHub DNS resolution fails; `wrangler` is not installed; the Playwright-managed Chromium browser is not installed. A system Chromium executable exists at `/usr/bin/chromium`, but this is not a substitute for a runnable GoTry dev server and test data. Do not label Playwright/Wrangler tests as passed.
 
 Explore session registration now surfaces fully booked / unavailable session messages in the visible page status instead of only in the hidden dialog. Successful registration feedback is shown **after** the activities reload, preventing the refreshed count from overwriting confirmation. Playwright regression cases were added but not run. The generated templates and inline scripts were evaluated/compiled successfully in V8 for all eight pages.
+
+## Local browser execution (without GitHub Actions)
+
+The Playwright config now supports the installed system Chromium through `GOTRY_CHROMIUM_PATH` and supports an already-running local Wrangler instance with `GOTRY_EXTERNAL_SERVER=1`. This avoids requiring Playwright's browser download when a compatible system Chromium is present.
+
+On a machine with a GitHub checkout, dependencies and Wrangler installed:
+
+```sh
+npm ci
+npx wrangler d1 migrations apply gotry-ci --config wrangler.ci.jsonc --local
+GOTRY_CHROMIUM_PATH=/usr/bin/chromium npm run e2e:ui
+```
+
+The UI suite normally starts local Wrangler using `playwright.config.js`. To use a separately running local server:
+
+```sh
+npx wrangler dev --config wrangler.ci.jsonc --local --ip 127.0.0.1 --port 8787
+# In another shell:
+GOTRY_EXTERNAL_SERVER=1 GOTRY_CHROMIUM_PATH=/usr/bin/chromium npm run e2e:ui
+```
+
+On macOS, omit `GOTRY_CHROMIUM_PATH` if Playwright Chromium is installed, or set it to the local Chromium executable. Both desktop Chrome and mobile iPhone-sized Chromium projects are configured. No GitHub Actions CI is required. This is a local-only workflow and never deploys Cloudflare.
+
+**Verification boundary (2026-11-09):** The assistant's container has Node and system Chromium but cannot resolve github.com to clone the repository, has no cached Wrangler package, and cannot start the real Worker/D1. Browser tests remain **not run**. Source-template JavaScript checks are separate and do not prove browser layout. The mobile header now scrolls navigation horizontally rather than growing into multiple rows; confirm it in the browser suite.

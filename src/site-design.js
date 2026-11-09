@@ -42,6 +42,9 @@ body{min-width:0;overflow-wrap:break-word}
 header.site-header{min-width:0}
 header.site-header nav{min-width:0}
 header.site-header nav a{white-space:nowrap}
+header.site-header nav{row-gap:10px}
+header.site-header nav a{min-height:36px;display:inline-flex;align-items:center}
+header.site-header nav a:focus-visible{border-radius:5px}
 main{min-width:0}
 main .panel,main article,main form{min-width:0}
 main .panel,main article{border-color:var(--line);border-radius:var(--radius);background:var(--paper)}
@@ -81,5 +84,5 @@ main #status[role=status],main [role=alert]{overflow-wrap:anywhere}
 .site-footer nav{display:flex;flex-wrap:wrap;gap:12px 18px}
 .site-footer nav a{color:#28476d;font-size:14px;text-decoration:none;font-weight:650}
 .site-footer nav a:hover{text-decoration:underline}
-@media(max-width:700px){main dialog{max-height:90dvh}main .filters>*{min-width:0;max-width:100%}.site-footer{margin-top:42px}.site-footer .footer-inner{padding:24px 18px;align-items:flex-start}.site-footer nav{width:100%}main .actions>button{max-width:100%}main .fields{grid-template-columns:minmax(0,1fr)}main .transfer-form{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:700px){header.site-header{display:block}header.site-header nav{display:flex;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;gap:16px;padding:8px 0 5px;max-width:100%;-webkit-overflow-scrolling:touch}header.site-header nav a{flex:0 0 auto;min-height:44px}header.site-header .brand{display:inline-block;margin-bottom:4px}main dialog{max-height:90dvh}main .filters>*{min-width:0;max-width:100%}.site-footer{margin-top:42px}.site-footer .footer-inner{padding:24px 18px;align-items:flex-start}.site-footer nav{width:100%}main .actions>button{max-width:100%}main .fields{grid-template-columns:minmax(0,1fr)}main .transfer-form{grid-template-columns:minmax(0,1fr)}}
 `;

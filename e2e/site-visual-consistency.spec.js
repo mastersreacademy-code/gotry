@@ -22,8 +22,9 @@ for(const path of pages){
   expect(metrics.brand).toBe('rgb(237, 34, 130)');
   expect(metrics.footer).toBe('rgb(255, 255, 255)');
   await page.keyboard.press('Tab');
-  const focused=await page.evaluate(()=>document.activeElement?.tagName);
-  expect(['A','BUTTON','INPUT','SELECT']).toContain(focused);
+  await expect(page.locator('.skip-link')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#main-content')).toBeFocused();
  });
 }
 
@@ -81,4 +82,17 @@ test('Explore reports missing open sessions without opening dialog',async({page}
  await page.getByRole('button',{name:'Register interest'}).click();
  await expect(page.locator('#status')).toContainText('No open trial sessions');
  await expect(page.locator('#interestDialog')).not.toBeVisible();
+});
+
+test('mobile navigation is scrollable without widening the document',async({page,isMobile})=>{
+ test.skip(!isMobile,'Mobile-only navigation behavior');
+ await page.goto('/');
+ const nav=page.locator('header.site-header nav');
+ const dimensions=await nav.evaluate(el=>({scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,overflow:getComputedStyle(el).overflowX}));
+ expect(dimensions.overflow).toBe('auto');
+ expect(dimensions.scrollWidth).toBeGreaterThanOrEqual(dimensions.clientWidth);
+ await nav.locator('a[href="/admin"]').focus();
+ await expect(nav.locator('a[href="/admin"]')).toBeFocused();
+ const pageWidth=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
+ expect(pageWidth).toBeLessThanOrEqual(2);
 });
