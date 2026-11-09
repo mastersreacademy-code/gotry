@@ -85,3 +85,45 @@ test('parent and provider cannot access each other\'s protected API',async()=>{
   assert.equal((await call(db,'/api/parent/interests','GET',undefined,sessions.provider)).status,403);
  }finally{sqlite.close();}
 });
+
+test('login locks after five failed attempts, then blocks even the correct password',async()=>{
+ const {db,sqlite}=fixture();
+ try{
+  const body=credentials('parent','locked@example.test');
+  assert.equal((await call(db,'/api/auth/register','POST',body)).status,201);
+  for(let n=0;n<5;n++){
+   const r=await call(db,'/api/auth/login','POST',{email:body.email,password:'incorrect password'});
+   assert.equal(r.status,401,'failed attempt '+(n+1));
+  }
+  const blocked=await call(db,'/api/auth/login','POST',{email:body.email,password:body.password});
+  assert.equal(blocked.status,429);
+  sqlite.prepare('UPDATE auth_attempts SET blocked_until=0 WHERE email_hash IS NOT NULL').run();
+  const success=await call(db,'/api/auth/login','POST',{email:body.email,password:body.password});
+  assert.equal(success.status,200);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM auth_attempts').get().n,0);
+ }finally{sqlite.close();}
+});
+test('duplicate email is case-insensitive and cannot change account role',async()=>{
+ const {db,sqlite}=fixture();
+ try{
+  const first=await call(db,'/api/auth/register','POST',credentials('parent','Same@Example.Test'));
+  assert.equal(first.status,201);
+  const second=await call(db,'/api/auth/register','POST',credentials('provider','same@example.test'));
+  assert.equal(second.status,409);
+  assert.equal(sqlite.prepare('SELECT COUNT(*) AS n FROM users').get().n,1);
+  assert.equal(sqlite.prepare('SELECT role FROM users').get().role,'parent');
+ }finally{sqlite.close();}
+});
+test('forged, expired, and revoked session cookies are rejected',async()=>{
+ const {db,sqlite}=fixture();
+ try{
+  const created=await call(db,'/api/auth/register','POST',credentials('provider','cookies@example.test'));
+  assert.equal(created.status,201);
+  const cookie=created.headers.get('set-cookie').split(';')[0];
+  assert.equal((await call(db,'/api/auth/me','GET',undefined,'gotry_session='+('f'.repeat(64)))).status,401);
+  assert.equal((await call(db,'/api/auth/me','GET',undefined,'gotry_session=invalid')).status,401);
+  assert.equal((await call(db,'/api/auth/me','GET',undefined,cookie)).status,200);
+  assert.equal((await call(db,'/api/auth/logout','POST',{},cookie)).status,200);
+  assert.equal((await call(db,'/api/auth/me','GET',undefined,cookie)).status,401);
+ }finally{sqlite.close();}
+});
