@@ -12,6 +12,10 @@ const pages={Home:page,Explore:activitiesPage,Account:authPage,Admin:adminPage,N
 for(const [name,html] of Object.entries(pages)){
  test(name+' uses shared GoTry visual system and noindex',()=>{
   assert.match(html,/class="site-header"/);
+  assert.match(html,/class="site-footer"/);
+  assert.match(html,/aria-label="Footer navigation"/);
+  assert.match(html,/\.site-footer \.footer-inner/);
+  assert.match(html,/@media\(max-width:700px\)/);
   assert.match(html,/class="brand"/);
   assert.match(html,/Go<span>Try<\/span>/);
   assert.match(html,/--pink:#ed2282/);
