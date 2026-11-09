@@ -27,6 +27,10 @@ for(const [name,html] of Object.entries(pages)){
   assert.match(html,/Go<span>Try<\/span>/);
   assert.match(html,/--pink:#ed2282/);
   assert.match(html,/--blue:#176dd0/);
+  assert.match(html,/Cross-page component polish/);
+  assert.match(html,/\.site-header nav a\[aria-current=page\]\{background:#eaf3ff/);
+  assert.match(html,/main \[role=alert\]/);
+  assert.match(html,/main table\{display:block;overflow-x:auto/);
   assert.match(html,/name="robots" content="noindex,nofollow"/);
   assert.match(html,/name="viewport"/);
   assert.match(html,/href="\/activities"/);
