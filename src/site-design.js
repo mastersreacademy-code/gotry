@@ -2,6 +2,16 @@
 // Keep styling as HTML/CSS rather than embedding text in images.
 export const siteHeader = `<a class="skip-link" href="#main-content">Skip to main content</a><header class="site-header"><a href="/" class="brand" aria-label="GoTry home">Go<span>Try</span></a><nav aria-label="Main navigation"><a href="/">Home</a><a href="/activities">Explore activities</a><a href="/provider/new">For providers</a><a href="/parent">Parent</a><a href="/provider">Provider</a><a href="/notifications">Notifications</a><a href="/account">Account</a><a href="/admin">Admin</a></nav></header>`;
 
+// Mark the current destination without client-side scripts (Home has a restrictive CSP).
+export function siteHeaderFor(path) {
+  const allowed = ['/', '/activities', '/provider/new', '/parent', '/provider', '/notifications', '/account', '/admin'];
+  if (!allowed.includes(path)) return siteHeader;
+  const navStart = siteHeader.indexOf('<nav aria-label="Main navigation">');
+  const prefix = siteHeader.slice(0, navStart);
+  const nav = siteHeader.slice(navStart);
+  return prefix + nav.replace('href="' + path + '"', 'href="' + path + '" aria-current="page"');
+}
+
 export const siteCss = `
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#10234a;background:#f8fbff;--ink:#10234a;--muted:#627089;--blue:#176dd0;--pink:#ed2282;--line:#e3e9f2;--paper:#fff;--radius:16px}
 *,*::before,*::after{box-sizing:border-box}

@@ -8,10 +8,15 @@ import {notificationsPage} from '../src/notifications-page.js';
 import {wizardPage} from '../src/wizard-page.js';
 import {parentDashboard,providerDashboard} from '../src/dashboard-pages.js';
 
+const expectedRoutes={Home:'/',Explore:'/activities',Account:'/account',Admin:'/admin',Notifications:'/notifications',Wizard:'/provider/new',Parent:'/parent',Provider:'/provider'};
 const pages={Home:page,Explore:activitiesPage,Account:authPage,Admin:adminPage,Notifications:notificationsPage,Wizard:wizardPage,Parent:parentDashboard,Provider:providerDashboard};
 for(const [name,html] of Object.entries(pages)){
  test(name+' uses shared GoTry visual system and noindex',()=>{
   assert.match(html,/class="site-header"/);
+  const nav=html.match(/<nav aria-label="Main navigation">([\\s\\S]*?)<\\/nav>/)?.[1];
+  assert.ok(nav,name+' main navigation exists');
+  assert.equal((nav.match(/aria-current="page"/g)||[]).length,1,name+' has one active nav item');
+  assert.ok(nav.includes('href="'+expectedRoutes[name]+'" aria-current="page"'),name+' active nav matches route');
   assert.match(html,/class="skip-link" href="#main-content"/);
   assert.match(html,/id="main-content" tabindex="-1"/);
   assert.match(html,/class="site-footer"/);
