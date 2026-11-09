@@ -31,9 +31,13 @@ el('form').addEventListener('change',e=>{if(e.target.name){data[e.target.name]=e
 el('back').addEventListener('click',()=>{if(step>0){step--;render();}});
 async function submitActivity(){
  const errors={};for(let i=0;i<4;i++){for(const [k,label,,required] of spec[i])if(required&&!String(data[k]??'').trim())errors[k]=label+' is required';}
- if(Object.keys(errors).length){el('saved').textContent='Missing required information: '+Object.values(errors).join('; ');return;}
+ if(data.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email))errors.email='Enter a valid email';
+ if(!(Number(data.minAge)>=1)||!(Number(data.maxAge)>=Number(data.minAge))||Number(data.maxAge)>18)errors.maxAge='Age range must be between 1 and 18';
+ if(data.trialType==='group'&&(!(Number(data.minParticipants)>0)||Number(data.maxParticipants)<Number(data.minParticipants)))errors.maxParticipants='Enter a valid group size range';
+ if(!Number.isFinite(Number(data.regularPrice))||Number(data.regularPrice)<0)errors.regularPrice='Price must not be negative';
+ if(Object.keys(errors).length){el('saved').textContent='Please review: '+Object.values(errors).join('; ');return;}
  el('next').disabled=true;el('saved').textContent='Submitting activity…';
- try{const r=await fetch('/api/provider/activities',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)});const result=await r.json();if(!r.ok)throw Error(result.error||JSON.stringify(result.errors)||'Submission failed');localStorage.removeItem(key);el('saved').textContent='Submitted for admin approval. Reference: '+result.id;el('next').textContent='Submitted';}
+ try{const r=await fetch('/api/provider/activities',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)});const result=await r.json();if(!r.ok){const details=result.errors&&typeof result.errors==='object'?Object.entries(result.errors).map(([field,message])=>field+': '+message).join('; '):'';throw Error(result.error||details||'Submission failed');}localStorage.removeItem(key);el('saved').textContent='Submitted for admin approval. Reference: '+result.id;el('next').textContent='Submitted';}
  catch(e){el('next').disabled=false;el('saved').textContent=e.message+(e.message==='Unauthenticated'?' — Sign in at /account first.':'');}
 }
 el('form').addEventListener('submit',e=>{
