@@ -5,7 +5,7 @@ import {providerDashboard,parentDashboard} from '../src/dashboard-pages.js';
 import {adminPage} from '../src/admin-page.js';
 const api=readFileSync(new URL('../src/api.js',import.meta.url),'utf8');
 test('provider cancellation binds the UTC cutoff before owner ID',()=>{
- assert.match(api,/bind\(cancelSession\[1\],expectedStartsAt,new Date\(\)\.toISOString\(\),user\.id\)\.run\(\)/);
+ assert.match(api,/bind\(cancelSession\[1\],expectedStartsAt,expectedEndsAt,expectedVenue,new Date\(\)\.toISOString\(\),user\.id\)\.run\(\)/);
 });
 test('parent transfer and withdrawal reject expired source sessions atomically',()=>{
  assert.match(api,/old\.status='open' AND old\.starts_at_utc>\?/);

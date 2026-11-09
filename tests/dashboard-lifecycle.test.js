@@ -7,7 +7,7 @@ const api=readFileSync(new URL('../src/api.js',import.meta.url),'utf8');
 
 test('rescheduling rejects started sessions before and during SQL update',()=>{
  assert.match(api,/Started or past sessions cannot be rescheduled/);
- assert.match(api,/WHERE id=\? AND status='open' AND starts_at=\? AND starts_at_utc>\? AND EXISTS/);
+ assert.match(api,/WHERE id=\? AND status='open' AND starts_at=\? AND ends_at=\? AND venue=\? AND starts_at_utc>\? AND EXISTS/);
 });
 test('provider session controls reflect full, minimum and expired states',()=>{
  for(const label of ['Session full','Minimum reached','Started or past sessions cannot be cancelled','Session confirmed by admin'])assert.ok(providerDashboard.includes(label),label);
