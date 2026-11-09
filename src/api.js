@@ -76,7 +76,7 @@ export async function handleApi(req,env){
   // is deterministically derived from the outbox id.
   await db.batch([
    db.prepare("INSERT OR IGNORE INTO notifications(id,user_id,activity_id,kind,title,message,created_at) SELECT substr(id,1,8)||'-'||substr(id,9,4)||'-'||substr(id,13,4)||'-'||substr(id,17,4)||'-'||substr(id,21,12),user_id,activity_id,kind,title,message,created_at FROM session_notification_outbox WHERE user_id=? AND delivered_at IS NULL").bind(user.id),
-   db.prepare("UPDATE session_notification_outbox SET delivered_at=CURRENT_TIMESTAMP WHERE user_id=? AND delivered_at IS NULL").bind(user.id)
+   db.prepare("UPDATE session_notification_outbox SET delivered_at=CURRENT_TIMESTAMP WHERE user_id=? AND delivered_at IS NULL AND EXISTS (SELECT 1 FROM notifications n WHERE n.id=substr(session_notification_outbox.id,1,8)||'-'||substr(session_notification_outbox.id,9,4)||'-'||substr(session_notification_outbox.id,13,4)||'-'||substr(session_notification_outbox.id,17,4)||'-'||substr(session_notification_outbox.id,21,12) AND n.user_id=session_notification_outbox.user_id AND n.activity_id=session_notification_outbox.activity_id AND n.kind=session_notification_outbox.kind AND n.title=session_notification_outbox.title AND n.message=session_notification_outbox.message AND n.created_at=session_notification_outbox.created_at)").bind(user.id)
   ]);
   const rows=await db.prepare('SELECT id,kind,title,message,activity_id,read_at,created_at FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 50').bind(user.id).all();
   return json({notifications:rows.results||[]});
