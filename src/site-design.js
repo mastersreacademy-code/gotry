@@ -95,4 +95,26 @@ main #status[role=status],main [role=alert]{overflow-wrap:anywhere}
 .site-footer nav a{color:#28476d;font-size:14px;text-decoration:none;font-weight:650}
 .site-footer nav a:hover{text-decoration:underline}
 @media(max-width:700px){header.site-header{display:block}header.site-header nav{display:flex;flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;gap:16px;padding:8px 0 5px;max-width:100%;-webkit-overflow-scrolling:touch}header.site-header nav a{flex:0 0 auto;min-height:44px}header.site-header .brand{display:inline-block;margin-bottom:4px}main dialog{max-height:90dvh}main .filters>*{min-width:0;max-width:100%}.site-footer{margin-top:42px}.site-footer .footer-inner{padding:24px 18px;align-items:flex-start}.site-footer nav{width:100%}main .actions>button{max-width:100%}main .fields{grid-template-columns:minmax(0,1fr)}main .transfer-form{grid-template-columns:minmax(0,1fr)}}
+
+/* Cross-page component polish: predictable sizing, readable states and mobile-safe content. */
+.site-header{position:relative;z-index:2}
+.site-header nav a{border-radius:8px;padding:4px 6px;transition:background-color .15s ease,color .15s ease}
+.site-header nav a:hover,.site-header nav a:focus-visible{background:#edf5ff}
+.site-header nav a[aria-current=page]{background:#eaf3ff;text-decoration:none;font-weight:800}
+main .panel,main article{transition:box-shadow .15s ease,border-color .15s ease}
+main article:hover{border-color:#c9d9ed;box-shadow:0 12px 28px #15315a14}
+main .cta{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;gap:8px}
+main button:not(:disabled):hover,main .cta:hover{filter:brightness(.96)}
+main button:disabled,main [aria-disabled=true]{cursor:not-allowed;opacity:.55}
+main :is(input,select,textarea):invalid:not(:placeholder-shown){border-color:#bd3659}
+main :is(input,select,textarea):focus-visible{border-color:var(--blue)}
+main [role=alert]{border-left:4px solid #b63854;padding:10px 14px;background:#fff2f5;border-radius:8px}
+main [role=status]{line-height:1.55}
+main :is(table,pre,code){max-width:100%}
+main table{display:block;overflow-x:auto;border-collapse:collapse}
+main th,main td{text-align:left;vertical-align:top}
+main img,main svg,main video{max-width:100%;height:auto}
+.site-footer nav a{padding:4px 0}
+@media(max-width:700px){.site-header nav{margin-inline:-4px}.site-header nav a{padding:7px 10px}.site-header nav a[aria-current=page]{background:#eaf3ff}.site-footer .footer-inner{gap:14px}main :is(button,.cta){max-width:100%}main .panel,main article{overflow-wrap:anywhere}}
+@media(prefers-reduced-motion:reduce){.site-header nav a,main .panel,main article{transition:none}}
 `;

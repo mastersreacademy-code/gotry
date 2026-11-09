@@ -13,7 +13,7 @@ const pages={Home:page,Explore:activitiesPage,Account:authPage,Admin:adminPage,N
 for(const [name,html] of Object.entries(pages)){
  test(name+' uses shared GoTry visual system and noindex',()=>{
   assert.match(html,/class="site-header"/);
-  const nav=html.match(/<nav aria-label="Main navigation">([\\s\\S]*?)<\\/nav>/)?.[1];
+  const nav=html.match(/<nav aria-label="Main navigation">([\s\S]*?)<\/nav>/)?.[1];
   assert.ok(nav,name+' main navigation exists');
   assert.equal((nav.match(/aria-current="page"/g)||[]).length,1,name+' has one active nav item');
   assert.ok(nav.includes('href="'+expectedRoutes[name]+'" aria-current="page"'),name+' active nav matches route');
@@ -27,6 +27,10 @@ for(const [name,html] of Object.entries(pages)){
   assert.match(html,/Go<span>Try<\/span>/);
   assert.match(html,/--pink:#ed2282/);
   assert.match(html,/--blue:#176dd0/);
+  assert.match(html,/Cross-page component polish/);
+  assert.match(html,/\.site-header nav a\[aria-current=page\]\{background:#eaf3ff/);
+  assert.match(html,/main \[role=alert\]/);
+  assert.match(html,/main table\{display:block;overflow-x:auto/);
   assert.match(html,/name="robots" content="noindex,nofollow"/);
   assert.match(html,/name="viewport"/);
   assert.match(html,/href="\/activities"/);
