@@ -18,7 +18,8 @@ for(const [name,html] of Object.entries(pages)){
   assert.equal((nav.match(/aria-current="page"/g)||[]).length,1,name+' has one active nav item');
   assert.ok(nav.includes('href="'+expectedRoutes[name]+'" aria-current="page"'),name+' active nav matches route');
   assert.match(html,/class="skip-link" href="#main-content"/);
-  assert.match(html,/id="main-content" tabindex="-1"/);
+  assert.match(html,/<main\b[^>]*id="main-content"[^>]*>/);
+  assert.match(html.match(/<main\b[^>]*>/)[0],/tabindex="-1"/);
   assert.match(html,/class="site-footer"/);
   assert.match(html,/aria-label="Footer navigation"/);
   assert.match(html,/\.site-footer \.footer-inner/);
@@ -38,3 +39,4 @@ for(const [name,html] of Object.entries(pages)){
   assert.match(html,/href="\/provider"/);
  });
 }
+

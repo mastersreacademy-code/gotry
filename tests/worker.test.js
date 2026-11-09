@@ -13,7 +13,7 @@ test('homepage explains trial flow without collecting payments', async () => {
  assert.equal(r.headers.get('x-robots-tag'),'noindex, nofollow');
  assert.match(html,/Try before you enrol/i);
  assert.match(html,/Register interest/i);
- assert.match(html,/No registrations or payments are accepted/i);
+ assert.match(html,/no live bookings or payments/i);
 });
 test('unknown route returns 404', async () => {
  const r = await worker.fetch(new Request('https://gotry.example/unknown'));

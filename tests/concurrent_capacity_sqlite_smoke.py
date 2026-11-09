@@ -12,7 +12,7 @@ import threading
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATIONS = sorted((ROOT / "migrations").glob("*.sql"))
-assert [p.name[:4] for p in MIGRATIONS] == [f"{i:04}" for i in range(1, 12)], "Expected migrations 0001–0011"
+assert [p.name[:4] for p in MIGRATIONS] == [f"{i:04}" for i in range(1, 14)], "Expected migrations 0001–0013"
 
 with TemporaryDirectory() as directory:
     path = str(Path(directory) / "gotry.sqlite")
@@ -106,3 +106,4 @@ with TemporaryDirectory() as directory:
     db.close()
 
 print("PASS: migrations 0001–0011, 10 concurrent writers, capacity, uniqueness, rollback, outbox, cancellation and privacy")
+
