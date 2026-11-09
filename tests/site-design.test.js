@@ -12,6 +12,8 @@ const pages={Home:page,Explore:activitiesPage,Account:authPage,Admin:adminPage,N
 for(const [name,html] of Object.entries(pages)){
  test(name+' uses shared GoTry visual system and noindex',()=>{
   assert.match(html,/class="site-header"/);
+  assert.match(html,/class="skip-link" href="#main-content"/);
+  assert.match(html,/id="main-content" tabindex="-1"/);
   assert.match(html,/class="site-footer"/);
   assert.match(html,/aria-label="Footer navigation"/);
   assert.match(html,/\.site-footer \.footer-inner/);
