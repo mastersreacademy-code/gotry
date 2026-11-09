@@ -114,6 +114,10 @@ export async function handleApi(req,env){
   const deadline=details.deadline|| (session?session.starts_at.slice(0,10):details.trialDate);
   if(!/^\d{4}-\d{2}-\d{2}$/.test(deadline)||deadline<utcToSydney(new Date().toISOString()).slice(0,10))return bad('Registration deadline has passed',409);
   if(childAge<Number(details.minAge)||childAge>Number(details.maxAge))return bad('Age is outside the activity range',422);
+  // One active registration per child per activity, regardless of session.
+  // The database trigger in migration 0010 closes concurrent-request races.
+  const active=await db.prepare("SELECT id FROM interests WHERE activity_id=? AND parent_id=? AND lower(trim(child_name))=lower(trim(?)) AND status='interested' LIMIT 1").bind(activityId,user.id,childName).first();
+  if(active)return bad('This child already has an active registration for this activity. Use Parent dashboard to change sessions.',409);
   const existing=await db.prepare('SELECT id,status,session_id FROM interests WHERE activity_id=? AND parent_id=? AND child_name=? AND session_id IS ?').bind(activityId,user.id,childName,sessionId||null).first();
   
   if(existing){if(existing.status==='interested')return bad('Interest already registered',409);const result=await db.prepare("UPDATE interests SET status='interested',child_age=?,session_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations' AND (json_extract(data_json,'$.deadline') IS NULL OR json_extract(data_json,'$.deadline')>=?)) AND (?='' OR EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND status='open' AND starts_at_utc>?)) AND (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)) < ?").bind(childAge,sessionId||null,existing.id,activityId,utcToSydney(new Date().toISOString()).slice(0,10),sessionId,sessionId,new Date().toISOString(),activityId,sessionId,sessionId,capacity).run();if(result.meta?.changes!==1)return bad('Trial is full',409);return json({id:existing.id,status:'interested'});}
@@ -302,5 +306,5 @@ export async function handleApi(req,env){
   return json({id:match[1],status});
  }
  return bad('Not found',404);
- }catch(e){if(e instanceof SyntaxError)return bad('Invalid JSON');if(e.message==='Request too large')return bad(e.message,413);if(/trial session unavailable or full|UNIQUE constraint failed: interests|interests_child_session_unique|interests_child_legacy_unique/i.test(String(e.message||'')))return bad('Session unavailable, full or already registered',409);return bad('Request failed',500);}
+ }catch(e){if(e instanceof SyntaxError)return bad('Invalid JSON');if(e.message==='Request too large')return bad(e.message,413);if(/child already registered for this activity/i.test(String(e.message||'')))return bad('This child already has an active registration for this activity. Use Parent dashboard to change sessions.',409);if(/trial session unavailable or full|UNIQUE constraint failed: interests|interests_child_session_unique|interests_child_legacy_unique/i.test(String(e.message||'')))return bad('Session unavailable, full or already registered',409);return bad('Request failed',500);}
 }
