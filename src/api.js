@@ -42,8 +42,12 @@ export async function handleApi(req,env){
   const body=await readBody(req),email=String(body.email||'').trim().toLowerCase(),password=String(body.password||''),role=body.role;
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254||password.length<12||password.length>128||!['parent','provider'].includes(role))return bad('Valid email, role and password of 12-128 characters required');
   const existing=await db.prepare('SELECT id FROM users WHERE email=?').bind(email).first();if(existing)return bad('Account already exists',409);
-  await db.prepare('INSERT INTO users(id,email,password_hash,role) VALUES(?,?,?,?)').bind(crypto.randomUUID(),email,await passwordHash(password),role).run();
-  return json({ok:true},201);
+  const id=crypto.randomUUID(),token=hex(crypto.getRandomValues(new Uint8Array(32))),hash=await sha256(token),expiry=Math.floor(Date.now()/1000)+86400;
+  await db.batch([
+   db.prepare('INSERT INTO users(id,email,password_hash,role) VALUES(?,?,?,?)').bind(id,email,await passwordHash(password),role),
+   db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(hash,id,expiry)
+  ]);
+  return json({ok:true,user:{id,email,role}},201,{'set-cookie':sessionCookie(token,86400)});
  }
  if(path==='/api/auth/login'&&method==='POST'){
   const body=await readBody(req),email=String(body.email||'').trim().toLowerCase(),password=String(body.password||'');
