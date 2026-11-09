@@ -30,3 +30,40 @@ main .note{border-radius:12px}
 @media(max-width:700px){header.site-header{padding:16px 20px;align-items:flex-start;gap:12px}header.site-header nav{gap:10px 14px}header.site-header nav a{font-size:13px}main{margin:26px auto;padding:0 18px}main.home-main{margin:0 auto;padding:42px 18px}main .panel,main article{padding:18px}main h1{font-size:clamp(30px,8vw,40px)}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 `;
+
+export const siteFooter = `<footer class="site-footer"><div class="footer-inner"><a href="/" class="brand" aria-label="GoTry home">Go<span>Try</span></a><p>Try before you enrol. Early prototype — no live bookings or payments.</p><nav aria-label="Footer navigation"><a href="/">Home</a><a href="/activities">Explore</a><a href="/provider/new">For providers</a><a href="/account">Account</a></nav></div></footer>`;
+export const siteRefinements = `
+/* Shared refinements are appended last, after each page's legacy CSS. */
+:root{color-scheme:light}
+body{min-width:0;overflow-wrap:break-word}
+header.site-header{min-width:0}
+header.site-header nav{min-width:0}
+header.site-header nav a{white-space:nowrap}
+main{min-width:0}
+main .panel,main article,main form{min-width:0}
+main .panel,main article{border-color:var(--line);border-radius:var(--radius);background:var(--paper)}
+main h1{color:var(--ink)}
+main button:not(.danger):not(.secondary){background:var(--blue);color:#fff}
+main button.secondary{background:#fff;color:var(--blue);border:1px solid #c8d8ed}
+main button.danger{background:#a32d4d;color:#fff}
+main button{min-height:44px;border-radius:11px;font-weight:700}
+main input,main select,main textarea{min-height:44px;border-radius:10px;border-color:#c8d8ed;color:var(--ink)}
+main .actions{display:flex;flex-wrap:wrap;gap:12px}
+main .actions>*{min-width:0}
+main .note{background:#fff5d8;color:#63470c;padding:16px;border-radius:12px}
+main .empty{border:1px dashed #bac9da;box-shadow:none}
+main .pill{border-radius:999px}
+main .meter{overflow:hidden;border-radius:999px}
+main form{max-width:100%}
+main form input,main form select,main form textarea{max-width:100%}
+main .filters{min-width:0}
+.site-footer{margin-top:70px;border-top:1px solid var(--line);background:#fff;color:var(--muted)}
+.site-footer .footer-inner{max-width:1080px;margin:0 auto;padding:30px 24px;display:flex;align-items:center;gap:16px 28px;flex-wrap:wrap}
+.site-footer .brand{font-size:23px;font-weight:850;letter-spacing:-1px;color:#126dd4;text-decoration:none}
+.site-footer .brand span{color:var(--pink)}
+.site-footer p{margin:0;flex:1 1 250px;font-size:14px}
+.site-footer nav{display:flex;flex-wrap:wrap;gap:12px 18px}
+.site-footer nav a{color:#28476d;font-size:14px;text-decoration:none;font-weight:650}
+.site-footer nav a:hover{text-decoration:underline}
+@media(max-width:700px){.site-footer{margin-top:42px}.site-footer .footer-inner{padding:24px 18px;align-items:flex-start}.site-footer nav{width:100%}main .actions>button{max-width:100%}main .fields{grid-template-columns:minmax(0,1fr)}main .transfer-form{grid-template-columns:minmax(0,1fr)}}
+`;
