@@ -174,7 +174,8 @@ export async function handleApi(req,env){
   const activity=await db.prepare("SELECT id FROM activities WHERE id=? AND provider_id=? AND status='pending_approval'").bind(providerSessions[1],user.id).first();
   if(!activity)return bad('Only your pending-approval activities can add sessions',403);
   const id=crypto.randomUUID();
-  await db.prepare("INSERT INTO trial_sessions(id,activity_id,starts_at,ends_at,venue,min_participants,max_participants,starts_at_utc,ends_at_utc) VALUES(?,?,?,?,?,?,?,?,?)").bind(id,providerSessions[1],startsAt,endsAt,venue,min,max,startUtc,endUtc).run();
+  const inserted=await db.prepare("INSERT INTO trial_sessions(id,activity_id,starts_at,ends_at,venue,min_participants,max_participants,starts_at_utc,ends_at_utc) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM activities WHERE id=? AND provider_id=? AND status='pending_approval')").bind(id,providerSessions[1],startsAt,endsAt,venue,min,max,startUtc,endUtc,providerSessions[1],user.id).run();
+  if(inserted.meta?.changes!==1)return bad('Activity changed while scheduling; refresh Provider dashboard',409);
   await notify(db,user.id,providerSessions[1],'session_created','Trial session scheduled','A new trial session was added to your pending activity.');
   return json({id,status:'open'},201);
  }
@@ -263,13 +264,15 @@ export async function handleApi(req,env){
   if(user.role!=='admin')return bad('Forbidden',403);
   const b=await readBody(req),decision=String(b.decision||'');
   if(!['confirm','cancel'].includes(decision))return bad('Invalid decision');
+  const expectedStartsAt=String(b.expectedStartsAt||'');
+  if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(expectedStartsAt))return bad('Original session start required; refresh Admin schedule',422);
   const s=await db.prepare("SELECT s.activity_id,s.starts_at,s.starts_at_utc,s.min_participants,s.status,(SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested') AS interested FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.status='pending_registrations'").bind(sessionDecision[1]).first();
   if(!s||s.status!=='open')return bad('Session unavailable',409);
   if(decision==='confirm'&&(s.interested<s.min_participants||!s.starts_at_utc||s.starts_at_utc<=new Date().toISOString()))return bad('Minimum not reached or session has started',409);
   if(decision==='cancel'&&(s.interested>=s.min_participants||(s.starts_at_utc?s.starts_at_utc>=new Date().toISOString():s.starts_at.slice(0,10)>=utcToSydney(new Date().toISOString()).slice(0,10))))return bad('Cannot cancel before session date or when minimum is reached',409);
   const next=decision==='confirm'?'confirmed':'cancelled';
   const [changed]=await db.batch([
-   db.prepare("UPDATE trial_sessions SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND status='pending_registrations') AND ((?='confirmed' AND starts_at_utc IS NOT NULL AND starts_at_utc>? AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')>=min_participants) OR (?='cancelled' AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')<min_participants AND starts_at_utc IS NOT NULL AND starts_at_utc<?))").bind(next,sessionDecision[1],next,new Date().toISOString(),next,new Date().toISOString()),
+   db.prepare("UPDATE trial_sessions SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND starts_at=? AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND status='pending_registrations') AND ((?='confirmed' AND starts_at_utc IS NOT NULL AND starts_at_utc>? AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')>=min_participants) OR (?='cancelled' AND (SELECT COUNT(*) FROM interests WHERE session_id=trial_sessions.id AND status='interested')<min_participants AND starts_at_utc IS NOT NULL AND starts_at_utc<?))").bind(next,sessionDecision[1],expectedStartsAt,next,new Date().toISOString(),next,new Date().toISOString()),
    db.prepare("INSERT INTO audit_events(id,actor_id,activity_id,action) SELECT ?,?,?,? WHERE changes()=1 AND EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND status=?)").bind(crypto.randomUUID(),user.id,s.activity_id,'session_'+decision,sessionDecision[1],next)
   ]);
   if(changed.meta?.changes!==1)return bad('Already updated',409);
