@@ -21,5 +21,5 @@ test('provider cancel and reschedule reject stale schedules',()=>{
  for(const code of [cancel,reschedule])assert.match(code,/status='open' AND starts_at=\? AND starts_at_utc>\?/);
  assert.match(cancel,/bind\(cancelSession\[1\],expectedStartsAt,new Date\(\)\.toISOString\(\),user\.id\)/);
  assert.match(reschedule,/bind\(start,end,startUtc,endUtc,venue,reschedule\[1\],expectedStartsAt,new Date\(\)\.toISOString\(\),user\.id\)/);
- assert.ok(providerDashboard.includes('expectedStartsAt:s.starts_at'));
+ assert.ok(providerDashboard.includes('expectedStartsAt:s.starts_at,expectedEndsAt:s.ends_at,expectedVenue:s.venue'));
 });
