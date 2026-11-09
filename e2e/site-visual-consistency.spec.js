@@ -12,6 +12,8 @@ for(const path of pages){
   await expect(page.locator('footer.site-footer')).toHaveCount(1);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content','noindex,nofollow');
   await expect(page.locator('header.site-header nav a[href="/activities"]')).toBeVisible();
+  await expect(page.locator('header.site-header nav a[aria-current="page"]')).toHaveCount(1);
+  await expect(page.locator('header.site-header nav a[aria-current="page"]')).toHaveAttribute('href',path);
   const metrics=await page.evaluate(()=>({
    viewport:document.documentElement.clientWidth,
    content:document.documentElement.scrollWidth,
