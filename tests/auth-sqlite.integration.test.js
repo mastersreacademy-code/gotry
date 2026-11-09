@@ -2,15 +2,19 @@
 // Uses Node's built-in SQLite engine and the actual worker/API and SQL migrations.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import worker from '../src/index.js';
 
 const origin='https://gotry.example';
 function fixture(){
  const sqlite=new DatabaseSync(':memory:');
- sqlite.exec(readFileSync(new URL('../migrations/0001_initial.sql',import.meta.url),'utf8'));
- sqlite.exec(readFileSync(new URL('../migrations/0003_auth_throttle.sql',import.meta.url),'utf8'));
+ const migrationDir=new URL('../migrations/',import.meta.url);
+ const migrations=readdirSync(migrationDir).filter(name=>/^\\d+_.*\\.sql$/.test(name)).sort();
+ assert.equal(migrations.length,13,'Review new migrations before changing expected count');
+ sqlite.exec('PRAGMA foreign_keys=ON');
+ for(const migration of migrations)sqlite.exec(readFileSync(new URL(migration,migrationDir),'utf8'));
+ assert.deepEqual(sqlite.prepare('PRAGMA foreign_key_check').all(),[]);
  const prepare=(sql)=>({
   bind(...args){const statement=sqlite.prepare(sql);return {
    first:async()=>statement.get(...args)||null,
