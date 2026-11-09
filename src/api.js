@@ -318,13 +318,16 @@ export async function handleApi(req,env){
    ? attendance+'>='+trialMinimum+' AND '+attendance+'<='+trialMaximum
    : attendance+'<'+trialMinimum+" AND COALESCE(json_extract(data_json,'$.deadline'),json_extract(data_json,'$.trialDate'))<?";
   const sql="UPDATE activities SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_registrations' AND "+noSessions+" AND "+lifecycleCondition;
+  const auditId=crypto.randomUUID();
+  const providerNoticeId=crypto.randomUUID();
   const query=db.prepare(sql);
-  const result=await (action==='confirm_minimum'?query.bind(status,lifecycle[1]):query.bind(status,lifecycle[1],today)).run();
+  const [result]=await db.batch([
+   action==='confirm_minimum'?query.bind(status,lifecycle[1]):query.bind(status,lifecycle[1],today),
+   db.prepare("INSERT INTO audit_events(id,actor_id,activity_id,action) SELECT ?,?,?,? WHERE changes()=1").bind(auditId,user.id,lifecycle[1],action),
+   db.prepare("INSERT INTO notifications(id,user_id,activity_id,kind,title,message) SELECT ?,provider_id,id,'trial_status','Trial status updated',? FROM activities WHERE id=? AND EXISTS(SELECT 1 FROM audit_events WHERE id=?)").bind(providerNoticeId,status.replaceAll('_',' '),lifecycle[1],auditId),
+   db.prepare("INSERT INTO notifications(id,user_id,activity_id,kind,title,message) SELECT lower(hex(randomblob(4)))||'-'||lower(hex(randomblob(2)))||'-4'||substr(lower(hex(randomblob(2))),2)||'-a'||substr(lower(hex(randomblob(2))),2)||'-'||lower(hex(randomblob(6))),parent_id,activity_id,'trial_status','Trial status updated',? FROM (SELECT DISTINCT parent_id,activity_id FROM interests WHERE activity_id=? AND status='interested') WHERE EXISTS(SELECT 1 FROM audit_events WHERE id=?)").bind(status==='proceeding_pending_payments'?'Minimum interest reached. This is not a confirmed booking or payment request.':'The trial did not reach the minimum and has been cancelled.',lifecycle[1],auditId)
+  ]);
   if(result.meta?.changes!==1)return bad('Activity already updated',409);
-  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,lifecycle[1],action).run();
-  const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(lifecycle[1]).first();
-  if(owner)await notify(db,owner.provider_id,lifecycle[1],'trial_status','Trial status updated',status.replaceAll('_',' '));
-  await notifyInterested(db,lifecycle[1],'trial_status','Trial status updated',status==='proceeding_pending_payments'?'Minimum interest reached. This is not a confirmed booking or payment request.':'The trial did not reach the minimum and has been cancelled.');
   return json({id:lifecycle[1],status});
  }
  const match=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})\/decision$/);
