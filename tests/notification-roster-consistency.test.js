@@ -5,9 +5,9 @@ import {parentDashboard,providerDashboard} from '../src/dashboard-pages.js';
 import {notificationsPage} from '../src/notifications-page.js';
 const api=readFileSync(new URL('../src/api.js',import.meta.url),'utf8');
 test('provider roster is count-only until confirmed and excludes cancelled activities',()=>{
- assert.match(api,/const namesAvailable=owned\.status==='confirmed'&&!owned\.activity_status\.startsWith\('cancelled'\)/);
- assert.match(api,/if\(!namesAvailable\)return json\(\{roster:\[\],count:Number\(count\.n\),namesAvailable:false\}\)/);
- assert.match(api,/SELECT child_name FROM interests WHERE session_id=\?/);
+ assert.ok(api.includes("CASE WHEN s.status='confirmed' AND a.status NOT LIKE 'cancelled%' THEN i.child_name ELSE NULL END"));
+ assert.ok(api.includes("a.provider_id=? ORDER BY i.created_at ASC LIMIT 100"));
+ assert.ok(api.includes("roster:namesAvailable?result.filter(x=>x.child_name!==null)"));
  assert.ok(providerDashboard.includes("d.count+' interested'"));
 });
 test('parent transfer uses effective registration deadline',()=>{
