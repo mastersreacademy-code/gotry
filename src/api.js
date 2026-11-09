@@ -332,11 +332,14 @@ export async function handleApi(req,env){
   if(user.role!=='admin')return bad('Forbidden',403);
   const body=await readBody(req);if(!['approve','reject'].includes(body.decision))return bad('Invalid decision');
   const status=body.decision==='approve'?'pending_registrations':'rejected',note=String(body.note||'').slice(0,1000);
-  const result=await db.prepare("UPDATE activities SET status=?,admin_note=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_approval'").bind(status,note,match[1]).run();
+  const auditId=crypto.randomUUID();
+  const noticeId=crypto.randomUUID();
+  const [result]=await db.batch([
+   db.prepare("UPDATE activities SET status=?,admin_note=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_approval'").bind(status,note,match[1]),
+   db.prepare("INSERT INTO audit_events(id,actor_id,activity_id,action) SELECT ?,?,?,? WHERE changes()=1").bind(auditId,user.id,match[1],body.decision),
+   db.prepare("INSERT INTO notifications(id,user_id,activity_id,kind,title,message) SELECT ?,provider_id,id,'approval_decision',?,? FROM activities WHERE id=? AND EXISTS(SELECT 1 FROM audit_events WHERE id=?)").bind(noticeId,status==='rejected'?'Activity rejected':'Activity approved',status==='rejected'?'Admin rejected this submission. See your dashboard for feedback.':'Your activity is now open for expressions of interest.',match[1],auditId)
+  ]);
   if(result.meta?.changes!==1)return bad('Activity unavailable or already reviewed',409);
-  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,match[1],body.decision).run();
-  const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(match[1]).first();
-  if(owner)await notify(db,owner.provider_id,match[1],'approval_decision',status==='rejected'?'Activity rejected':'Activity approved',status==='rejected'?'Admin rejected this submission. See your dashboard for feedback.':'Your activity is now open for expressions of interest.');
   return json({id:match[1],status});
  }
  return bad('Not found',404);
