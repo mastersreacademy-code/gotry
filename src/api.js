@@ -123,9 +123,9 @@ export async function handleApi(req,env){
   if(active)return bad('This child already has an active registration for this activity. Use Parent dashboard to change sessions.',409);
   const existing=await db.prepare('SELECT id,status,session_id FROM interests WHERE activity_id=? AND parent_id=? AND lower(trim(child_name))=lower(trim(?)) AND session_id IS ? ORDER BY created_at DESC LIMIT 1').bind(activityId,user.id,childName,sessionId||null).first();
   
-  if(existing){if(existing.status==='interested')return bad('Interest already registered',409);const result=await db.prepare("UPDATE interests SET status='interested',child_age=?,session_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='withdrawn' AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations' AND COALESCE(json_extract(data_json,'$.deadline'),json_extract(data_json,'$.trialDate'))>=?) AND (?='' OR EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND status='open' AND starts_at_utc>?)) AND (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)) < ?").bind(childAge,sessionId||null,existing.id,activityId,utcToSydney(new Date().toISOString()).slice(0,10),sessionId,sessionId,new Date().toISOString(),activityId,sessionId,sessionId,capacity).run();if(result.meta?.changes!==1)return bad('Trial is full',409);return json({id:existing.id,status:'interested'});}
+  if(existing){if(existing.status==='interested')return bad('Interest already registered',409);const result=await db.prepare("UPDATE interests SET status='interested',child_age=?,session_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='withdrawn' AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations' AND COALESCE(json_extract(data_json,'$.deadline'),json_extract(data_json,'$.trialDate'))>=?) AND ((?='' AND NOT EXISTS(SELECT 1 FROM trial_sessions WHERE activity_id=?)) OR (?<>'' AND EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND activity_id=? AND status='open' AND starts_at_utc>?))) AND (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)) < ?").bind(childAge,sessionId||null,existing.id,activityId,utcToSydney(new Date().toISOString()).slice(0,10),sessionId,activityId,sessionId,sessionId,activityId,new Date().toISOString(),activityId,sessionId,sessionId,capacity).run();if(result.meta?.changes!==1)return bad('Trial is full',409);return json({id:existing.id,status:'interested'});}
   const id=crypto.randomUUID();
-  const result=await db.prepare("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age,session_id) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)) < ? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations' AND COALESCE(json_extract(data_json,'$.deadline'),json_extract(data_json,'$.trialDate'))>=?) AND (?='' OR EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND status='open' AND starts_at_utc>?))").bind(id,activityId,user.id,childName,childAge,sessionId||null,activityId,sessionId,sessionId,capacity,activityId,utcToSydney(new Date().toISOString()).slice(0,10),sessionId,sessionId,new Date().toISOString()).run();
+  const result=await db.prepare("INSERT INTO interests(id,activity_id,parent_id,child_name,child_age,session_id) SELECT ?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested' AND (?='' OR session_id=?)) < ? AND EXISTS(SELECT 1 FROM activities WHERE id=? AND status='pending_registrations' AND COALESCE(json_extract(data_json,'$.deadline'),json_extract(data_json,'$.trialDate'))>=?) AND ((?='' AND NOT EXISTS(SELECT 1 FROM trial_sessions WHERE activity_id=?)) OR (?<>'' AND EXISTS(SELECT 1 FROM trial_sessions WHERE id=? AND activity_id=? AND status='open' AND starts_at_utc>?)))").bind(id,activityId,user.id,childName,childAge,sessionId||null,activityId,sessionId,sessionId,capacity,activityId,utcToSydney(new Date().toISOString()).slice(0,10),sessionId,activityId,sessionId,sessionId,activityId,new Date().toISOString()).run();
   if(result.meta?.changes!==1)return bad('Trial is full or unavailable',409);
   // Interest triggers enqueue parent/provider notifications atomically with this insert.
   return json({id,status:'interested'},201);
@@ -238,10 +238,15 @@ export async function handleApi(req,env){
  const cancel=path.match(/^\/api\/provider\/activities\/([a-f0-9-]{36})\/cancel$/);
  if(cancel&&method==='POST'){
   if(user.role!=='provider')return bad('Forbidden',403);
-  const result=await db.prepare("UPDATE activities SET status='cancelled_by_provider',updated_at=CURRENT_TIMESTAMP WHERE id=? AND provider_id=? AND status IN ('pending_approval','pending_registrations')").bind(cancel[1],user.id).run();
+  // D1 batch is transactional. Couple status, audit and parent notifications
+  // so a partial failure cannot cancel the activity without its notices.
+  const auditId=crypto.randomUUID();
+  const [result]=await db.batch([
+   db.prepare("UPDATE activities SET status='cancelled_by_provider',updated_at=CURRENT_TIMESTAMP WHERE id=? AND provider_id=? AND status IN ('pending_approval','pending_registrations')").bind(cancel[1],user.id),
+   db.prepare("INSERT INTO audit_events(id,actor_id,activity_id,action) SELECT ?,?,?,? WHERE changes()=1").bind(auditId,user.id,cancel[1],'cancel_by_provider'),
+   db.prepare("INSERT INTO notifications(id,user_id,activity_id,kind,title,message) SELECT lower(hex(randomblob(4)))||'-'||lower(hex(randomblob(2)))||'-4'||substr(lower(hex(randomblob(2))),2)||'-a'||substr(lower(hex(randomblob(2))),2)||'-'||lower(hex(randomblob(6))),parent_id,activity_id,'trial_cancelled','Trial cancelled','The provider has cancelled this trial. No payment was collected by GoTry.' FROM (SELECT DISTINCT parent_id,activity_id FROM interests WHERE activity_id=? AND status='interested') WHERE EXISTS(SELECT 1 FROM audit_events WHERE id=?)").bind(cancel[1],auditId)
+  ]);
   if(result.meta?.changes!==1)return bad('Activity unavailable or cannot be cancelled',409);
-  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,cancel[1],'cancel_by_provider').run();
-  await notifyInterested(db,cancel[1],'trial_cancelled','Trial cancelled','The provider has cancelled this trial. No payment was collected by GoTry.');
   return json({id:cancel[1],status:'cancelled_by_provider'});
  }
  if(path==='/api/admin/activities'&&method==='GET'){
@@ -313,13 +318,16 @@ export async function handleApi(req,env){
    ? attendance+'>='+trialMinimum+' AND '+attendance+'<='+trialMaximum
    : attendance+'<'+trialMinimum+" AND COALESCE(json_extract(data_json,'$.deadline'),json_extract(data_json,'$.trialDate'))<?";
   const sql="UPDATE activities SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_registrations' AND "+noSessions+" AND "+lifecycleCondition;
+  const auditId=crypto.randomUUID();
+  const providerNoticeId=crypto.randomUUID();
   const query=db.prepare(sql);
-  const result=await (action==='confirm_minimum'?query.bind(status,lifecycle[1]):query.bind(status,lifecycle[1],today)).run();
+  const [result]=await db.batch([
+   action==='confirm_minimum'?query.bind(status,lifecycle[1]):query.bind(status,lifecycle[1],today),
+   db.prepare("INSERT INTO audit_events(id,actor_id,activity_id,action) SELECT ?,?,?,? WHERE changes()=1").bind(auditId,user.id,lifecycle[1],action),
+   db.prepare("INSERT INTO notifications(id,user_id,activity_id,kind,title,message) SELECT ?,provider_id,id,'trial_status','Trial status updated',? FROM activities WHERE id=? AND EXISTS(SELECT 1 FROM audit_events WHERE id=?)").bind(providerNoticeId,status.replaceAll('_',' '),lifecycle[1],auditId),
+   db.prepare("INSERT INTO notifications(id,user_id,activity_id,kind,title,message) SELECT lower(hex(randomblob(4)))||'-'||lower(hex(randomblob(2)))||'-4'||substr(lower(hex(randomblob(2))),2)||'-a'||substr(lower(hex(randomblob(2))),2)||'-'||lower(hex(randomblob(6))),parent_id,activity_id,'trial_status','Trial status updated',? FROM (SELECT DISTINCT parent_id,activity_id FROM interests WHERE activity_id=? AND status='interested') WHERE EXISTS(SELECT 1 FROM audit_events WHERE id=?)").bind(status==='proceeding_pending_payments'?'Minimum interest reached. This is not a confirmed booking or payment request.':'The trial did not reach the minimum and has been cancelled.',lifecycle[1],auditId)
+  ]);
   if(result.meta?.changes!==1)return bad('Activity already updated',409);
-  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,lifecycle[1],action).run();
-  const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(lifecycle[1]).first();
-  if(owner)await notify(db,owner.provider_id,lifecycle[1],'trial_status','Trial status updated',status.replaceAll('_',' '));
-  await notifyInterested(db,lifecycle[1],'trial_status','Trial status updated',status==='proceeding_pending_payments'?'Minimum interest reached. This is not a confirmed booking or payment request.':'The trial did not reach the minimum and has been cancelled.');
   return json({id:lifecycle[1],status});
  }
  const match=path.match(/^\/api\/admin\/activities\/([a-f0-9-]{36})\/decision$/);
@@ -327,11 +335,14 @@ export async function handleApi(req,env){
   if(user.role!=='admin')return bad('Forbidden',403);
   const body=await readBody(req);if(!['approve','reject'].includes(body.decision))return bad('Invalid decision');
   const status=body.decision==='approve'?'pending_registrations':'rejected',note=String(body.note||'').slice(0,1000);
-  const result=await db.prepare("UPDATE activities SET status=?,admin_note=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_approval'").bind(status,note,match[1]).run();
+  const auditId=crypto.randomUUID();
+  const noticeId=crypto.randomUUID();
+  const [result]=await db.batch([
+   db.prepare("UPDATE activities SET status=?,admin_note=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_approval'").bind(status,note,match[1]),
+   db.prepare("INSERT INTO audit_events(id,actor_id,activity_id,action) SELECT ?,?,?,? WHERE changes()=1").bind(auditId,user.id,match[1],body.decision),
+   db.prepare("INSERT INTO notifications(id,user_id,activity_id,kind,title,message) SELECT ?,provider_id,id,'approval_decision',?,? FROM activities WHERE id=? AND EXISTS(SELECT 1 FROM audit_events WHERE id=?)").bind(noticeId,status==='rejected'?'Activity rejected':'Activity approved',status==='rejected'?'Admin rejected this submission. See your dashboard for feedback.':'Your activity is now open for expressions of interest.',match[1],auditId)
+  ]);
   if(result.meta?.changes!==1)return bad('Activity unavailable or already reviewed',409);
-  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,match[1],body.decision).run();
-  const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(match[1]).first();
-  if(owner)await notify(db,owner.provider_id,match[1],'approval_decision',status==='rejected'?'Activity rejected':'Activity approved',status==='rejected'?'Admin rejected this submission. See your dashboard for feedback.':'Your activity is now open for expressions of interest.');
   return json({id:match[1],status});
  }
  return bad('Not found',404);
