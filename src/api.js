@@ -238,10 +238,15 @@ export async function handleApi(req,env){
  const cancel=path.match(/^\/api\/provider\/activities\/([a-f0-9-]{36})\/cancel$/);
  if(cancel&&method==='POST'){
   if(user.role!=='provider')return bad('Forbidden',403);
-  const result=await db.prepare("UPDATE activities SET status='cancelled_by_provider',updated_at=CURRENT_TIMESTAMP WHERE id=? AND provider_id=? AND status IN ('pending_approval','pending_registrations')").bind(cancel[1],user.id).run();
+  // D1 batch is transactional. Couple status, audit and parent notifications
+  // so a partial failure cannot cancel the activity without its notices.
+  const auditId=crypto.randomUUID();
+  const [result]=await db.batch([
+   db.prepare("UPDATE activities SET status='cancelled_by_provider',updated_at=CURRENT_TIMESTAMP WHERE id=? AND provider_id=? AND status IN ('pending_approval','pending_registrations')").bind(cancel[1],user.id),
+   db.prepare("INSERT INTO audit_events(id,actor_id,activity_id,action) SELECT ?,?,?,? WHERE changes()=1").bind(auditId,user.id,cancel[1],'cancel_by_provider'),
+   db.prepare("INSERT INTO notifications(id,user_id,activity_id,kind,title,message) SELECT lower(hex(randomblob(4)))||'-'||lower(hex(randomblob(2)))||'-4'||substr(lower(hex(randomblob(2))),2)||'-a'||substr(lower(hex(randomblob(2))),2)||'-'||lower(hex(randomblob(6))),parent_id,activity_id,'trial_cancelled','Trial cancelled','The provider has cancelled this trial. No payment was collected by GoTry.' FROM (SELECT DISTINCT parent_id,activity_id FROM interests WHERE activity_id=? AND status='interested') WHERE EXISTS(SELECT 1 FROM audit_events WHERE id=?)").bind(cancel[1],auditId)
+  ]);
   if(result.meta?.changes!==1)return bad('Activity unavailable or cannot be cancelled',409);
-  await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,cancel[1],'cancel_by_provider').run();
-  await notifyInterested(db,cancel[1],'trial_cancelled','Trial cancelled','The provider has cancelled this trial. No payment was collected by GoTry.');
   return json({id:cancel[1],status:'cancelled_by_provider'});
  }
  if(path==='/api/admin/activities'&&method==='GET'){
