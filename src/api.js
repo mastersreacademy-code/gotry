@@ -141,14 +141,14 @@ export async function handleApi(req,env){
   const cutoff=String(d.deadline||'');
   if(cutoff&&(!/^\d{4}-\d{2}-\d{2}$/.test(cutoff)||cutoff<utcToSydney(new Date().toISOString()).slice(0,10)))return bad('Registration deadline has passed',409);
   const now=new Date().toISOString(),today=utcToSydney(now).slice(0,10);
-  const updated=await db.prepare("UPDATE interests SET session_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested' AND NOT EXISTS(SELECT 1 FROM interests other WHERE other.activity_id=interests.activity_id AND other.parent_id=interests.parent_id AND other.child_name=interests.child_name AND other.session_id=? AND other.id<>interests.id) AND EXISTS(SELECT 1 FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND s.activity_id=interests.activity_id AND s.status='open' AND s.starts_at_utc>? AND substr(s.starts_at,1,10)>=? AND a.status='pending_registrations' AND (json_extract(a.data_json,'$.deadline') IS NULL OR json_extract(a.data_json,'$.deadline')>=?) AND (interests.session_id IS NULL OR EXISTS(SELECT 1 FROM trial_sessions old WHERE old.id=interests.session_id AND old.status='open')) AND (SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested')<s.max_participants)").bind(target,transfer[1],user.id,target,target,now,today,today).run();
+  const updated=await db.prepare("UPDATE interests SET session_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested' AND NOT EXISTS(SELECT 1 FROM interests other WHERE other.activity_id=interests.activity_id AND other.parent_id=interests.parent_id AND other.child_name=interests.child_name AND other.session_id=? AND other.id<>interests.id) AND EXISTS(SELECT 1 FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND s.activity_id=interests.activity_id AND s.status='open' AND s.starts_at_utc>? AND substr(s.starts_at,1,10)>=? AND a.status='pending_registrations' AND (json_extract(a.data_json,'$.deadline') IS NULL OR json_extract(a.data_json,'$.deadline')>=?) AND EXISTS(SELECT 1 FROM trial_sessions old WHERE old.id=interests.session_id AND old.status='open' AND old.starts_at_utc>?) AND (SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested')<s.max_participants)").bind(target,transfer[1],user.id,target,target,now,today,today,now).run();
   if(updated.meta?.changes!==1)return bad('Target session unavailable, full or already registered',409);
   return json({id:transfer[1],sessionId:target,status:'interested'});
  }
  const withdraw=path.match(/^\/api\/parent\/interests\/([a-f0-9-]{36})\/withdraw$/);
  if(withdraw&&method==='POST'){
   if(user.role!=='parent')return bad('Forbidden',403);
-  const result=await db.prepare("UPDATE interests SET status='withdrawn',updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested' AND (session_id IS NULL OR EXISTS(SELECT 1 FROM trial_sessions s WHERE s.id=interests.session_id AND s.status='open'))").bind(withdraw[1],user.id).run();
+  const result=await db.prepare("UPDATE interests SET status='withdrawn',updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested' AND (session_id IS NULL OR EXISTS(SELECT 1 FROM trial_sessions s WHERE s.id=interests.session_id AND s.status='open' AND s.starts_at_utc>?))").bind(withdraw[1],user.id,new Date().toISOString()).run();
   if(result.meta?.changes!==1)return bad('Interest unavailable, already withdrawn or session closed',409);
   
   return json({id:withdraw[1],status:'withdrawn'});
@@ -187,7 +187,7 @@ export async function handleApi(req,env){
   const s=await db.prepare("SELECT s.activity_id,s.status FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=? AND a.status IN ('pending_approval','pending_registrations')").bind(cancelSession[1],user.id).first();
   if(!s)return bad('Not found',404);
   if(s.status!=='open')return bad('Only open sessions can be cancelled',409);
-  const changed=await db.prepare("UPDATE trial_sessions SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND starts_at_utc>? AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND provider_id=? AND status IN ('pending_approval','pending_registrations'))").bind(cancelSession[1],user.id).run();
+  const changed=await db.prepare("UPDATE trial_sessions SET status='cancelled',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='open' AND starts_at_utc>? AND EXISTS(SELECT 1 FROM activities WHERE id=trial_sessions.activity_id AND provider_id=? AND status IN ('pending_approval','pending_registrations'))").bind(cancelSession[1],new Date().toISOString(),user.id).run();
   if(changed.meta?.changes!==1)return bad('Session already changed',409);
   return json({id:cancelSession[1],status:'cancelled'});
  }
