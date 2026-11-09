@@ -23,7 +23,7 @@ try:
     raise AssertionError('Overbooked session')
 except sqlite3.IntegrityError:
     pass
-add('four','b','Child 1')
+add('four','b','Child 4')
 assert db.execute("SELECT COUNT(*) FROM interests WHERE status='interested'").fetchone()[0]==3
 try:
     db.execute("UPDATE interests SET session_id='a' WHERE id='four'")
