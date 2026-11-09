@@ -59,3 +59,11 @@ GOTRY_EXTERNAL_SERVER=1 GOTRY_CHROMIUM_PATH=/usr/bin/chromium npm run e2e:ui
 On macOS, omit `GOTRY_CHROMIUM_PATH` if Playwright Chromium is installed, or set it to the local Chromium executable. Both desktop Chrome and mobile iPhone-sized Chromium projects are configured. No GitHub Actions CI is required. This is a local-only workflow and never deploys Cloudflare.
 
 **Verification boundary (2026-11-09):** The assistant's container has Node and system Chromium but cannot resolve github.com to clone the repository, has no cached Wrangler package, and cannot start the real Worker/D1. Browser tests remain **not run**. Source-template JavaScript checks are separate and do not prove browser layout. The mobile header now scrolls navigation horizontally rather than growing into multiple rows; confirm it in the browser suite.
+
+## Active navigation and execution limits (2026-11-09)
+
+Each of the eight routes now renders exactly one `aria-current="page"` on the shared primary navigation. The header is rendered on the server through `siteHeaderFor(path)`; no browser script or relaxed CSP is required. Both the Node design regression and desktop/mobile Playwright checks assert the correct active link.
+
+Environment investigation repeated: Node.js 22.16.0, system Chromium and Python Playwright are present. `wrangler`, `@playwright/test` and the GoTry checkout are absent; `github.com` DNS resolution fails, so `git clone` and package installation cannot complete. The GitHub connector permits source review and commits but does not mount a runnable repository in the local container. The **real Wrangler D1 and Playwright desktop/mobile suites were not executed**. Do not interpret the V8 HTML/template/inline-script checks as browser or D1 test results.
+
+No GitHub Actions CI was triggered intentionally and no Cloudflare deployment was performed.
