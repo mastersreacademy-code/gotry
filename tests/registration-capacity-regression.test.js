@@ -29,7 +29,7 @@ test('dashboards expose a manual refresh after stale writes',async()=>{
 });
 
 test('reactivation requires withdrawn state at write time',()=>{
- assert.match(registration,/UPDATE interests SET status='interested',child_age=\\?,session_id=\\?,updated_at=CURRENT_TIMESTAMP WHERE id=\\? AND status='withdrawn' AND EXISTS/);
+ assert.match(registration,/UPDATE interests SET status='interested',child_age=\?,session_id=\?,updated_at=CURRENT_TIMESTAMP WHERE id=\? AND status='withdrawn' AND EXISTS/);
 });
 test('transfer normalizes child names before detecting duplicate destination',()=>{
  const transfer=api.slice(api.indexOf('const transfer=path.match'),api.indexOf('const withdraw=path.match'));
