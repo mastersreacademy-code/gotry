@@ -73,10 +73,10 @@ export async function handleApi(req,env){
  if(path==='/api/notifications'&&method==='GET'){
   // A D1 batch is transactional: delivery and acknowledgement commit together.
   // Repeated GETs cannot duplicate notifications, because the notification id
-  // is deterministically derived from the outbox id.
+  // is tied to a unique outbox_id independent of its notification id.
   await db.batch([
-   db.prepare("INSERT OR IGNORE INTO notifications(id,user_id,activity_id,kind,title,message,created_at) SELECT substr(id,1,8)||'-'||substr(id,9,4)||'-'||substr(id,13,4)||'-'||substr(id,17,4)||'-'||substr(id,21,12),user_id,activity_id,kind,title,message,created_at FROM session_notification_outbox WHERE user_id=? AND delivered_at IS NULL").bind(user.id),
-   db.prepare("UPDATE session_notification_outbox SET delivered_at=CURRENT_TIMESTAMP WHERE user_id=? AND delivered_at IS NULL AND EXISTS (SELECT 1 FROM notifications n WHERE n.id=substr(session_notification_outbox.id,1,8)||'-'||substr(session_notification_outbox.id,9,4)||'-'||substr(session_notification_outbox.id,13,4)||'-'||substr(session_notification_outbox.id,17,4)||'-'||substr(session_notification_outbox.id,21,12) AND n.user_id=session_notification_outbox.user_id AND n.activity_id=session_notification_outbox.activity_id AND n.kind=session_notification_outbox.kind AND n.title=session_notification_outbox.title AND n.message=session_notification_outbox.message AND n.created_at=session_notification_outbox.created_at)").bind(user.id)
+   db.prepare("INSERT OR IGNORE INTO notifications(id,user_id,activity_id,kind,title,message,created_at,outbox_id) SELECT lower(hex(randomblob(4)))||'-'||lower(hex(randomblob(2)))||'-4'||substr(lower(hex(randomblob(2))),2)||'-a'||substr(lower(hex(randomblob(2))),2)||'-'||lower(hex(randomblob(6))),user_id,activity_id,kind,title,message,created_at,id FROM session_notification_outbox WHERE user_id=? AND delivered_at IS NULL").bind(user.id),
+   db.prepare("UPDATE session_notification_outbox SET delivered_at=CURRENT_TIMESTAMP WHERE user_id=? AND delivered_at IS NULL AND EXISTS (SELECT 1 FROM notifications n WHERE n.outbox_id=session_notification_outbox.id AND n.user_id=session_notification_outbox.user_id AND n.activity_id=session_notification_outbox.activity_id AND n.kind=session_notification_outbox.kind AND n.title=session_notification_outbox.title AND n.message=session_notification_outbox.message AND n.created_at=session_notification_outbox.created_at)").bind(user.id)
   ]);
   const rows=await db.prepare('SELECT id,kind,title,message,activity_id,read_at,created_at FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 50').bind(user.id).all();
   return json({notifications:rows.results||[]});
