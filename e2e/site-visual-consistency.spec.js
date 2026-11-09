@@ -63,3 +63,22 @@ test('Explore search shows no-match guidance',async({page})=>{
  await expect(page.locator('#cards .empty')).toContainText('Clear the filters');
  await expect(page.locator('#status')).toContainText('No activities match');
 });
+
+test('Explore shows fully booked session feedback without opening an invisible dialog',async({page})=>{
+ await page.route('**/api/activities',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({activities:[{id:'demo',title:'Soccer',description:'Sports trial',category:'Sports',location:'Sydney',hasSessions:false}]})}));
+ await page.route('**/api/trial-sessions?**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({sessions:[{id:'full',starts_at:'2099-01-01',venue:'Sydney',remaining:0}],hasSessions:true})}));
+ await page.goto('/activities');
+ await page.getByRole('button',{name:'Register interest'}).click();
+ await expect(page.locator('#status')).toContainText('All available sessions are full');
+ await expect(page.locator('#interestDialog')).not.toBeVisible();
+ await expect(page.getByRole('button',{name:'Register interest'})).toBeEnabled();
+});
+
+test('Explore reports missing open sessions without opening dialog',async({page})=>{
+ await page.route('**/api/activities',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({activities:[{id:'demo',title:'Soccer',description:'Sports trial',category:'Sports',location:'Sydney',hasSessions:false}]})}));
+ await page.route('**/api/trial-sessions?**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({sessions:[],hasSessions:true})}));
+ await page.goto('/activities');
+ await page.getByRole('button',{name:'Register interest'}).click();
+ await expect(page.locator('#status')).toContainText('No open trial sessions');
+ await expect(page.locator('#interestDialog')).not.toBeVisible();
+});
