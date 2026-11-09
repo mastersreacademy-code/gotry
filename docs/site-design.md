@@ -29,3 +29,9 @@ Nested session forms must **not** inherit the standalone card surface styles; th
 Every page now has a keyboard-visible skip link to the focusable main landmark. The Explore Register Interest button no longer uses inline styling that conflicts with shared button rules. Activity discovery now distinguishes (a) no approved activities, (b) no matches for active filters and (c) failed API requests, with an accessible loading indicator (`aria-busy`). Session-fetch buttons are temporarily disabled during requests to reduce duplicate actions.
 
 Browser regression coverage includes mocked API success/empty/error and no-match filter cases. Run `npx playwright test e2e/site-visual-consistency.spec.js` after installing dependencies and launching the local Wrangler test environment. No browser suite was executed during this change; only actual V8 page-template evaluation and inline-script syntax checks ran.
+
+## Browser environment status and Explore session feedback
+
+Local execution environment check (2026-11-09): Node.js 22.16.0 and Python Playwright are available, but the GoTry repository cannot be cloned because GitHub DNS resolution fails; `wrangler` is not installed; the Playwright-managed Chromium browser is not installed. A system Chromium executable exists at `/usr/bin/chromium`, but this is not a substitute for a runnable GoTry dev server and test data. Do not label Playwright/Wrangler tests as passed.
+
+Explore session registration now surfaces fully booked / unavailable session messages in the visible page status instead of only in the hidden dialog. Successful registration feedback is shown **after** the activities reload, preventing the refreshed count from overwriting confirmation. Playwright regression cases were added but not run. The generated templates and inline scripts were evaluated/compiled successfully in V8 for all eight pages.
