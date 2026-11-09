@@ -302,7 +302,19 @@ export async function handleApi(req,env){
   if(action==='cancel_low_numbers'&&Number(count.total)>=minimum)return bad('Minimum already reached',409);
   if(action==='cancel_low_numbers'){const deadline=details.deadline||details.trialDate;if(!/^\d{4}-\d{2}-\d{2}$/.test(deadline)||deadline>=utcToSydney(new Date().toISOString()).slice(0,10))return bad('Registration deadline has not passed',409);}
   const status=action==='confirm_minimum'?'proceeding_pending_payments':'cancelled_low_numbers';
-  const result=await db.prepare("UPDATE activities SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_registrations'").bind(status,lifecycle[1]).run();
+  // Recheck attendance, schedule and deadline in the write itself. The earlier
+  // SELECTs provide helpful errors but are not concurrency guarantees.
+  const attendance="(SELECT COUNT(*) FROM interests i WHERE i.activity_id=activities.id AND i.status='interested')";
+  const noSessions="NOT EXISTS(SELECT 1 FROM trial_sessions s WHERE s.activity_id=activities.id)";
+  const trialMinimum="CASE WHEN json_extract(data_json,'$.trialType')='group' THEN CAST(json_extract(data_json,'$.minParticipants') AS INTEGER) ELSE 1 END";
+  const trialMaximum="CASE WHEN json_extract(data_json,'$.trialType')='group' THEN CAST(json_extract(data_json,'$.maxParticipants') AS INTEGER) ELSE 1 END";
+  const today=utcToSydney(new Date().toISOString()).slice(0,10);
+  const lifecycleCondition=action==='confirm_minimum'
+   ? attendance+'>='+trialMinimum+' AND '+attendance+'<='+trialMaximum
+   : attendance+'<'+trialMinimum+" AND COALESCE(json_extract(data_json,'$.deadline'),json_extract(data_json,'$.trialDate'))<?";
+  const sql="UPDATE activities SET status=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending_registrations' AND "+noSessions+" AND "+lifecycleCondition;
+  const query=db.prepare(sql);
+  const result=await (action==='confirm_minimum'?query.bind(status,lifecycle[1]):query.bind(status,lifecycle[1],today)).run();
   if(result.meta?.changes!==1)return bad('Activity already updated',409);
   await db.prepare('INSERT INTO audit_events(id,actor_id,activity_id,action) VALUES(?,?,?,?)').bind(crypto.randomUUID(),user.id,lifecycle[1],action).run();
   const owner=await db.prepare('SELECT provider_id FROM activities WHERE id=?').bind(lifecycle[1]).first();
