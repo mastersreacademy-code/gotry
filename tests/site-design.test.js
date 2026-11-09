@@ -13,7 +13,7 @@ const pages={Home:page,Explore:activitiesPage,Account:authPage,Admin:adminPage,N
 for(const [name,html] of Object.entries(pages)){
  test(name+' uses shared GoTry visual system and noindex',()=>{
   assert.match(html,/class="site-header"/);
-  const nav=html.match(/<nav aria-label="Main navigation">([\\s\\S]*?)<\\/nav>/)?.[1];
+  const nav=html.match(/<nav aria-label="Main navigation">([\s\S]*?)<\/nav>/)?.[1];
   assert.ok(nav,name+' main navigation exists');
   assert.equal((nav.match(/aria-current="page"/g)||[]).length,1,name+' has one active nav item');
   assert.ok(nav.includes('href="'+expectedRoutes[name]+'" aria-current="page"'),name+' active nav matches route');
