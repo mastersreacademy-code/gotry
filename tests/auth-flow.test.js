@@ -73,3 +73,15 @@ test('both dashboards expose sign out and wait for role verification before load
   assert.match(html,/authReady\.then\(ok=>\{if\(ok\)load\(\);\}\)/);
  }
 });
+
+test('malformed and non-object signup payloads return 400 without touching database',async()=>{
+ for(const body of ['{invalid','null','[]','"hello"','42']){
+  const response=await worker.fetch(new Request(origin+'/api/auth/register',{method:'POST',headers:{origin,'content-type':'application/json'},body}),{DB:{}});
+  assert.equal(response.status,400,body);
+  assert.match((await response.json()).error,/Invalid JSON body/);
+ }
+});
+test('malformed login JSON returns 400',async()=>{
+ const response=await worker.fetch(new Request(origin+'/api/auth/login',{method:'POST',headers:{origin,'content-type':'application/json'},body:'{broken'}),{DB:{}});
+ assert.equal(response.status,400);
+});
