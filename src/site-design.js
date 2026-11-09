@@ -1,6 +1,6 @@
 // One visual system for Home, Explore, Wizard, Account, Dashboards, Admin and Notifications.
 // Keep styling as HTML/CSS rather than embedding text in images.
-export const siteHeader = `<header class="site-header"><a href="/" class="brand" aria-label="GoTry home">Go<span>Try</span></a><nav aria-label="Main navigation"><a href="/">Home</a><a href="/activities">Explore activities</a><a href="/provider/new">For providers</a><a href="/parent">Parent</a><a href="/provider">Provider</a><a href="/notifications">Notifications</a><a href="/account">Account</a><a href="/admin">Admin</a></nav></header>`;
+export const siteHeader = `<a class="skip-link" href="#main-content">Skip to main content</a><header class="site-header"><a href="/" class="brand" aria-label="GoTry home">Go<span>Try</span></a><nav aria-label="Main navigation"><a href="/">Home</a><a href="/activities">Explore activities</a><a href="/provider/new">For providers</a><a href="/parent">Parent</a><a href="/provider">Provider</a><a href="/notifications">Notifications</a><a href="/account">Account</a><a href="/admin">Admin</a></nav></header>`;
 
 export const siteCss = `
 :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#10234a;background:#f8fbff;--ink:#10234a;--muted:#627089;--blue:#176dd0;--pink:#ed2282;--line:#e3e9f2;--paper:#fff;--radius:16px}
@@ -34,6 +34,9 @@ main .note{border-radius:12px}
 export const siteFooter = `<footer class="site-footer"><div class="footer-inner"><a href="/" class="brand" aria-label="GoTry home">Go<span>Try</span></a><p>Try before you enrol. Early prototype — no live bookings or payments.</p><nav aria-label="Footer navigation"><a href="/">Home</a><a href="/activities">Explore</a><a href="/provider/new">For providers</a><a href="/account">Account</a></nav></div></footer>`;
 export const siteRefinements = `
 /* Shared refinements are appended last, after each page's legacy CSS. */
+.skip-link{position:absolute;left:12px;top:-100px;z-index:1000;padding:10px 16px;border-radius:10px;background:#fff;color:#10234a;font-weight:750;box-shadow:0 3px 14px #10234a33}
+.skip-link:focus{top:10px}
+main:focus{outline:none}
 :root{color-scheme:light}
 body{min-width:0;overflow-wrap:break-word}
 header.site-header{min-width:0}
@@ -57,6 +60,10 @@ main .meter{overflow:hidden;border-radius:999px}
 main form{max-width:100%;min-width:0}
 main form input,main form select,main form textarea{max-width:100%}
 main .filters{min-width:0}
+main .register-interest{width:100%;margin-top:auto}
+main #cards>.empty{grid-column:1/-1;margin:0}
+main [aria-busy=true]{opacity:.8}
+main [role=status],main [role=alert]{overflow-wrap:anywhere}
 main dialog{max-width:min(94vw,480px);max-height:min(88dvh,760px);overflow:auto;border:1px solid var(--line);border-radius:18px;padding:clamp(18px,4vw,28px);box-shadow:0 24px 70px #142b5260;color:var(--ink)}
 main dialog::backdrop{background:#0f244b99}
 main dialog .actions{justify-content:flex-end}

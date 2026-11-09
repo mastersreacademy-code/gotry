@@ -23,3 +23,9 @@ Manual visual QA is still required on desktop and mobile: compare header wrappin
 Run `npx playwright test e2e/site-visual-consistency.spec.js` on a local checkout with Wrangler, Playwright and Chromium installed. The spec covers all eight pages at the existing desktop and iPhone 13 project sizes: shared header/footer, noindex, brand colour, focusability, and horizontal overflow. It also opens and closes the Explore registration dialog and checks viewport bounds.
 
 Nested session forms must **not** inherit the standalone card surface styles; the common CSS now restricts that surface treatment to cards and panels. Modal dialogs have capped viewport height, scrolling and responsive input sizing. The Playwright test was authored but not executed in the assistant environment because a runnable Wrangler project checkout was unavailable. The eight template/inline-script syntax checks did execute and passed.
+
+## Accessibility and states (follow-up)
+
+Every page now has a keyboard-visible skip link to the focusable main landmark. The Explore Register Interest button no longer uses inline styling that conflicts with shared button rules. Activity discovery now distinguishes (a) no approved activities, (b) no matches for active filters and (c) failed API requests, with an accessible loading indicator (`aria-busy`). Session-fetch buttons are temporarily disabled during requests to reduce duplicate actions.
+
+Browser regression coverage includes mocked API success/empty/error and no-match filter cases. Run `npx playwright test e2e/site-visual-consistency.spec.js` after installing dependencies and launching the local Wrangler test environment. No browser suite was executed during this change; only actual V8 page-template evaluation and inline-script syntax checks ran.

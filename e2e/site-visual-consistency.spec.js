@@ -7,6 +7,8 @@ for(const path of pages){
   await page.goto(path);
   await expect(page.locator('header.site-header .brand')).toBeVisible();
   await expect(page.locator('footer.site-footer')).toBeVisible();
+  await expect(page.locator('.skip-link')).toHaveAttribute('href','#main-content');
+  await expect(page.locator('main#main-content')).toHaveCount(1);
   await expect(page.locator('footer.site-footer')).toHaveCount(1);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content','noindex,nofollow');
   await expect(page.locator('header.site-header nav a[href="/activities"]')).toBeVisible();
@@ -40,4 +42,24 @@ test('Explore dialog fits viewport and has a usable close action',async({page})=
  await expect(cancel).toBeVisible();
  await cancel.click();
  await expect(dialog).not.toBeVisible();
+});
+
+test('Explore empty and failed API states are understandable',async({page})=>{
+ await page.route('**/api/activities',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({activities:[]})}));
+ await page.goto('/activities');
+ await expect(page.locator('#cards .empty')).toContainText('New trial activities');
+ await expect(page.locator('#cards')).toHaveAttribute('aria-busy','false');
+ await page.route('**/api/activities',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Service temporarily unavailable'})}));
+ await page.reload();
+ await expect(page.locator('#status')).toContainText('Service temporarily unavailable');
+ await expect(page.locator('#cards .empty')).toContainText('Could not load activities');
+ await expect(page.locator('#cards')).toHaveAttribute('aria-busy','false');
+});
+
+test('Explore search shows no-match guidance',async({page})=>{
+ await page.route('**/api/activities',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({activities:[{id:'demo',title:'Soccer',description:'Outdoor sport',category:'Sports',location:'Sydney'}]})}));
+ await page.goto('/activities');
+ await page.locator('#search').fill('zzzz-unmatched');
+ await expect(page.locator('#cards .empty')).toContainText('Clear the filters');
+ await expect(page.locator('#status')).toContainText('No activities match');
 });
