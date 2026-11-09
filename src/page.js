@@ -13,4 +13,4 @@ ${siteHeader}
 <article><span class="number">1</span><b>Discover activities</b><p>Find trial classes based on your child's interests, age and location.</p></article>
 <article><span class="number">2</span><b>Register interest</b><p>Express interest without paying upfront. Group trials proceed when the minimum is reached.</p></article>
 <article><span class="number">3</span><b>Try before enrolling</b><p>Confirm trial arrangements, attend and decide whether the regular programme is right for you.</p></article>
-</div><footer>This is an early prototype, not a live booking service. No registrations or payments are accepted.</footer></main>${siteFooter}</body></html>`;
+</div><p class="prototype-note">Early prototype only — no live bookings or payments.</p></main>${siteFooter}</body></html>`;
