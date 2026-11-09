@@ -10,7 +10,7 @@ const origin='https://gotry.example';
 function fixture(){
  const sqlite=new DatabaseSync(':memory:');
  const migrationDir=new URL('../migrations/',import.meta.url);
- const migrations=readdirSync(migrationDir).filter(name=>/^\\d+_.*\\.sql$/.test(name)).sort();
+ const migrations=readdirSync(migrationDir).filter(name=>name.endsWith('.sql')).sort();
  assert.equal(migrations.length,13,'Review new migrations before changing expected count');
  sqlite.exec('PRAGMA foreign_keys=ON');
  for(const migration of migrations)sqlite.exec(readFileSync(new URL(migration,migrationDir),'utf8'));
