@@ -81,10 +81,7 @@ test('malformed and non-object signup payloads return 400 without touching datab
   assert.match((await response.json()).error,/Invalid JSON body/);
  }
 });
-test('malformed login and logout JSON do not trigger internal server errors',async()=>{
- for(const path of ['/api/auth/login','/api/auth/logout']){
-  const response=await worker.fetch(new Request(origin+path,{method:'POST',headers:{origin,'content-type':'application/json'},body:'{broken'}),{DB:{}});
-  // Login parses its body first; logout requires session lookup and thus a configured DB schema.
-  if(path==='/api/auth/login')assert.equal(response.status,400);
- }
+test('malformed login JSON returns 400',async()=>{
+ const response=await worker.fetch(new Request(origin+'/api/auth/login',{method:'POST',headers:{origin,'content-type':'application/json'},body:'{broken'}),{DB:{}});
+ assert.equal(response.status,400);
 });
