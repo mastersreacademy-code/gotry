@@ -18,3 +18,12 @@ test('database capacity and active-child guards remain in migrations',()=>{
  for(const label of ['interest_session_capacity_insert','interest_session_capacity_update'])assert.ok(capacity.includes(label));
  for(const label of ['interest_active_child_insert','interest_active_child_update'])assert.ok(uniqueness.includes(label));
 });
+
+test('dashboards expose a manual refresh after stale writes',async()=>{
+ const {parentDashboard,providerDashboard}=await import('../src/dashboard-pages.js');
+ for(const page of [parentDashboard,providerDashboard]){
+  assert.ok(page.includes('id="refreshDashboard"'));
+  assert.ok(page.includes("addEventListener('click',load)"));
+  assert.ok(page.includes('noindex,nofollow'));
+ }
+});
