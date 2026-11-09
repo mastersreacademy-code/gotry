@@ -138,10 +138,10 @@ export async function handleApi(req,env){
   if(interest.session_id===null)return bad('Legacy interests cannot be transferred until their trial session is assigned',409);
   const d=JSON.parse(interest.data_json);
   if(interest.child_age<Number(d.minAge)||interest.child_age>Number(d.maxAge))return bad('Age outside activity range',422);
-  const cutoff=String(d.deadline||'');
+  const cutoff=String(d.deadline||d.trialDate||'');
   if(cutoff&&(!/^\d{4}-\d{2}-\d{2}$/.test(cutoff)||cutoff<utcToSydney(new Date().toISOString()).slice(0,10)))return bad('Registration deadline has passed',409);
   const now=new Date().toISOString(),today=utcToSydney(now).slice(0,10);
-  const updated=await db.prepare("UPDATE interests SET session_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested' AND NOT EXISTS(SELECT 1 FROM interests other WHERE other.activity_id=interests.activity_id AND other.parent_id=interests.parent_id AND other.child_name=interests.child_name AND other.session_id=? AND other.id<>interests.id) AND EXISTS(SELECT 1 FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND s.activity_id=interests.activity_id AND s.status='open' AND s.starts_at_utc>? AND substr(s.starts_at,1,10)>=? AND a.status='pending_registrations' AND (json_extract(a.data_json,'$.deadline') IS NULL OR json_extract(a.data_json,'$.deadline')>=?) AND EXISTS(SELECT 1 FROM trial_sessions old WHERE old.id=interests.session_id AND old.status='open' AND old.starts_at_utc>?) AND (SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested')<s.max_participants)").bind(target,transfer[1],user.id,target,target,now,today,today,now).run();
+  const updated=await db.prepare("UPDATE interests SET session_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND parent_id=? AND status='interested' AND NOT EXISTS(SELECT 1 FROM interests other WHERE other.activity_id=interests.activity_id AND other.parent_id=interests.parent_id AND other.child_name=interests.child_name AND other.session_id=? AND other.id<>interests.id) AND EXISTS(SELECT 1 FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND s.activity_id=interests.activity_id AND s.status='open' AND s.starts_at_utc>? AND substr(s.starts_at,1,10)>=? AND a.status='pending_registrations' AND COALESCE(json_extract(a.data_json,'$.deadline'),json_extract(a.data_json,'$.trialDate'))>=? AND EXISTS(SELECT 1 FROM trial_sessions old WHERE old.id=interests.session_id AND old.status='open' AND old.starts_at_utc>?) AND (SELECT COUNT(*) FROM interests i WHERE i.session_id=s.id AND i.status='interested')<s.max_participants)").bind(target,transfer[1],user.id,target,target,now,today,today,now).run();
   if(updated.meta?.changes!==1)return bad('Target session unavailable, full or already registered',409);
   return json({id:transfer[1],sessionId:target,status:'interested'});
  }
@@ -176,10 +176,13 @@ export async function handleApi(req,env){
  const roster=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/roster$/);
  if(roster&&method==='GET'){
   if(user.role!=='provider')return bad('Forbidden',403);
-  const owned=await db.prepare('SELECT s.id,s.status FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=?').bind(roster[1],user.id).first();
+  const owned=await db.prepare('SELECT s.id,s.status,a.status AS activity_status FROM trial_sessions s JOIN activities a ON a.id=s.activity_id WHERE s.id=? AND a.provider_id=?').bind(roster[1],user.id).first();
   if(!owned)return bad('Not found',404);
-  const rows=await db.prepare("SELECT CASE WHEN ?='confirmed' THEN i.child_name ELSE NULL END AS child_name FROM interests i WHERE i.session_id=? AND i.status='interested' ORDER BY i.created_at ASC LIMIT 100").bind(owned.status,roster[1]).all();
-  return json({roster:rows.results||[],namesAvailable:owned.status==='confirmed'});
+  const count=await db.prepare("SELECT COUNT(*) AS n FROM interests WHERE session_id=? AND status='interested'").bind(roster[1]).first();
+  const namesAvailable=owned.status==='confirmed'&&!owned.activity_status.startsWith('cancelled');
+  if(!namesAvailable)return json({roster:[],count:Number(count.n),namesAvailable:false});
+  const rows=await db.prepare("SELECT child_name FROM interests WHERE session_id=? AND status='interested' ORDER BY created_at ASC LIMIT 100").bind(roster[1]).all();
+  return json({roster:rows.results||[],count:Number(count.n),namesAvailable:true});
  }
  const cancelSession=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/cancel$/);
  if(cancelSession&&method==='POST'){
