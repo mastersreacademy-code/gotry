@@ -43,7 +43,7 @@ ${siteRefinements}</style></head>
 <label class="field"><span>Password</span><div class="password-wrap"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required maxlength="128"><button id="toggle-password" class="show-password" type="button" aria-label="Show password">Show</button></div><small id="password-hint" class="hint" hidden>Use at least 12 characters.</small></label>
 <label id="confirm-field" class="field" hidden><span>Confirm password</span><input id="confirm-password" type="password" autocomplete="new-password" placeholder="Enter your password again"></label>
 <button id="submit-btn" class="submit-btn" type="submit">Sign in</button><p id="status" class="auth-status" role="status" aria-live="polite"></p></form>
-<p class="auth-foot">GoTry is an early prototype. Please avoid using sensitive personal information or a password you use elsewhere.</p></section>
+<div id="signed-in-actions" hidden><a id="dashboard-link" href="/parent" class="cta">Open dashboard</a> <button id="logout-btn" type="button" class="secondary">Sign out</button></div><p class="auth-foot">GoTry is an early prototype. Please avoid using sensitive personal information or a password you use elsewhere.</p></section>
 </main>
 <script>
 (function(){
@@ -72,7 +72,8 @@ ${siteRefinements}</style></head>
  status.className='auth-status ok';status.textContent='Success. Opening your dashboard…';
  location.assign(data.user.role==='provider'?'/provider':data.user.role==='admin'?'/admin':'/parent');
  }catch(error){status.textContent=error.message||'Please try again.';busy=false;submit.disabled=false;loginTab.disabled=false;signupTab.disabled=false;submit.textContent=mode==='register'?'Create account':'Sign in';}});
+ document.getElementById('logout-btn').addEventListener('click',async function(){this.disabled=true;status.textContent='Signing out…';try{const r=await fetch('/api/auth/logout',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:'{}'});if(!r.ok)throw Error('Unable to sign out');location.assign('/account');}catch(e){status.textContent=e.message;this.disabled=false;}});
  const params=new URLSearchParams(location.search);if(params.get('mode')==='register'||params.get('mode')==='signup')setMode('register');
- fetch('/api/auth/me',{credentials:'same-origin'}).then(r=>r.ok?r.json():null).then(data=>{if(data&&data.user&&['parent','provider','admin'].includes(data.user.role)){document.getElementById('subtitle').textContent='You are already signed in. Open your dashboard to continue.';}}).catch(()=>{});
+ fetch('/api/auth/me',{credentials:'same-origin'}).then(r=>r.ok?r.json():null).then(data=>{if(data&&data.user&&['parent','provider','admin'].includes(data.user.role)){document.getElementById('subtitle').textContent='You are already signed in. Open your dashboard or sign out.';document.getElementById('signed-in-actions').hidden=false;document.getElementById('dashboard-link').href=data.user.role==='admin'?'/admin':data.user.role==='provider'?'/provider':'/parent';}}).catch(()=>{});
 })();
 </script>${siteFooter}</body></html>`;

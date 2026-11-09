@@ -37,3 +37,39 @@ test('signup fails closed without database',async()=>{
  const r=await worker.fetch(request('/api/auth/register','POST',{email:'parent@example.test',password:'longpassword123',role:'parent'}),{});
  assert.equal(r.status,503);
 });
+
+test('auth screen includes sign-out and existing-session dashboard routing',()=>{
+ assert.match(authPage,/id="logout-btn"/);
+ assert.match(authPage,/\/api\/auth\/logout/);
+ assert.match(authPage,/\/api\/auth\/me/);
+ assert.match(authPage,/data\.user\.role==='provider'\?'\/provider'/);
+});
+
+test('session cookies and authentication must be server-managed',async()=>{
+ const response=await worker.fetch(request('/account'));
+ const html=await response.text();
+ assert.doesNotMatch(html,/localStorage\.(setItem|getItem)/);
+ assert.doesNotMatch(html,/document\.cookie\s*=/);
+ assert.match(html,/credentials:'same-origin'/);
+});
+
+test('signup cannot be invoked without same-origin JSON',async()=>{
+ const body={email:'parent@example.test',password:'longpassword123',role:'parent'};
+ const r=await worker.fetch(new Request(origin+'/api/auth/register',{method:'POST',headers:{origin,'content-type':'text/plain'},body:JSON.stringify(body)}),{DB:{}});
+ assert.equal(r.status,415);
+});
+
+test('both dashboards expose sign out and wait for role verification before loading data',async()=>{
+ for(const [path,role] of [['/parent','parent'],['/provider','provider']]){
+  const r=await worker.fetch(request(path));
+  assert.equal(r.status,200);
+  assert.match(r.headers.get('x-robots-tag'),/noindex/);
+  const html=await r.text();
+  assert.match(html,/id="dashboard-signout"/);
+  assert.match(html,/\/api\/auth\/logout/);
+  assert.match(html,/\/api\/auth\/me/);
+  assert.match(html,/dashboardContent\.hidden=false/);
+  assert.ok(html.includes("d.user?.role!== '"+role+"'"));
+  assert.match(html,/authReady\.then\(ok=>\{if\(ok\)load\(\);\}\)/);
+ }
+});
