@@ -174,9 +174,11 @@ export async function handleApi(req,env){
   const activity=await db.prepare("SELECT id FROM activities WHERE id=? AND provider_id=? AND status='pending_approval'").bind(providerSessions[1],user.id).first();
   if(!activity)return bad('Only your pending-approval activities can add sessions',403);
   const id=crypto.randomUUID();
-  const inserted=await db.prepare("INSERT INTO trial_sessions(id,activity_id,starts_at,ends_at,venue,min_participants,max_participants,starts_at_utc,ends_at_utc) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM activities WHERE id=? AND provider_id=? AND status='pending_approval')").bind(id,providerSessions[1],startsAt,endsAt,venue,min,max,startUtc,endUtc,providerSessions[1],user.id).run();
+  const [inserted]=await db.batch([
+   db.prepare("INSERT INTO trial_sessions(id,activity_id,starts_at,ends_at,venue,min_participants,max_participants,starts_at_utc,ends_at_utc) SELECT ?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM activities WHERE id=? AND provider_id=? AND status='pending_approval')").bind(id,providerSessions[1],startsAt,endsAt,venue,min,max,startUtc,endUtc,providerSessions[1],user.id),
+   db.prepare("INSERT INTO notifications(id,user_id,activity_id,kind,title,message) SELECT ?,provider_id,id,'session_created','Trial session scheduled','A new trial session was added to your pending activity.' FROM activities WHERE id=? AND provider_id=? AND EXISTS(SELECT 1 FROM trial_sessions WHERE id=?)").bind(crypto.randomUUID(),providerSessions[1],user.id,id)
+  ]);
   if(inserted.meta?.changes!==1)return bad('Activity changed while scheduling; refresh Provider dashboard',409);
-  await notify(db,user.id,providerSessions[1],'session_created','Trial session scheduled','A new trial session was added to your pending activity.');
   return json({id,status:'open'},201);
  }
  const roster=path.match(/^\/api\/provider\/sessions\/([a-f0-9-]{36})\/roster$/);
@@ -226,8 +228,10 @@ export async function handleApi(req,env){
   for(let step=0;step<4;step++)Object.assign(errors,validateStep(step,data));
   if(Object.keys(errors).length)return json({errors},422);
   const id=crypto.randomUUID();
-  await db.prepare("INSERT INTO activities(id,provider_id,title,status,data_json) VALUES(?,?,?,'pending_approval',?)").bind(id,user.id,data.activityName,JSON.stringify(data)).run();
-  await notify(db,user.id,id,'activity_submitted','Activity submitted','Your activity is awaiting admin review.');
+  await db.batch([
+   db.prepare("INSERT INTO activities(id,provider_id,title,status,data_json) VALUES(?,?,?,'pending_approval',?)").bind(id,user.id,data.activityName,JSON.stringify(data)),
+   db.prepare("INSERT INTO notifications(id,user_id,activity_id,kind,title,message) VALUES(?,?,?,'activity_submitted','Activity submitted','Your activity is awaiting admin review.')").bind(crypto.randomUUID(),user.id,id)
+  ]);
   return json({id,status:'pending_approval'},201);
  }
  if(path==='/api/provider/activities'&&method==='GET'){
