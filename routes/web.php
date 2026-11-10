@@ -1,10 +1,15 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ProviderActivityController;
+use App\Http\Controllers\AdminActivityController;
+use App\Http\Controllers\ActivityDiscoveryController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'home')->name('home');
+Route::get('/activities', [ActivityDiscoveryController::class, 'index'])->name('activities.index');
+Route::get('/activities/{activity}', [ActivityDiscoveryController::class, 'show'])->whereNumber('activity')->name('activities.show');
 Route::get('/health', fn () => response()->json(['app' => 'gotry', 'runtime' => 'laravel', 'status' => 'ok']));
 Route::middleware('guest')->group(function (): void {
     Route::view('/account', 'auth.account', ['mode' => 'login'])->name('login');
@@ -22,8 +27,17 @@ Route::middleware('auth')->group(function (): void {
             default => abort(403),
         });
     })->name('dashboard');
-    foreach (['parent', 'provider', 'admin'] as $role) {
-        Route::view('/'.$role, 'dashboard', ['role' => $role])
-            ->middleware('role:'.$role)->name($role.'.dashboard');
-    }
+    Route::view('/parent', 'dashboard', ['role' => 'parent'])->middleware('role:parent')->name('parent.dashboard');
+    Route::middleware('role:provider')->group(function (): void {
+        Route::get('/provider', [ProviderActivityController::class, 'index'])->name('provider.dashboard');
+        Route::get('/provider/new/{step?}', [ProviderActivityController::class, 'create'])->where('step', '[1-5]')->block(10, 10)->name('provider.create');
+        Route::post('/provider/new/{step}', [ProviderActivityController::class, 'save'])->where('step', '[1-4]')->block(10, 10)->name('provider.save');
+        Route::post('/provider/submit', [ProviderActivityController::class, 'submit'])->block(10, 10)->name('provider.submit');
+        Route::get('/provider/activities/{activity}', [ProviderActivityController::class, 'show'])->whereNumber('activity')->name('provider.activity');
+    });
+    Route::middleware('role:admin')->group(function (): void {
+        Route::get('/admin', [AdminActivityController::class, 'index'])->name('admin.dashboard');
+        Route::get('/admin/activities/{activity}', [AdminActivityController::class, 'show'])->whereNumber('activity')->name('admin.activity');
+        Route::post('/admin/activities/{activity}/decision', [AdminActivityController::class, 'decide'])->whereNumber('activity')->name('admin.decision');
+    });
 });

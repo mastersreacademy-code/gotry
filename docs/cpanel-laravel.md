@@ -38,7 +38,7 @@ Keep database credentials and APP_KEY out of GitHub. GoTry's cookie name is sepa
 
 ## First installation and verification
 
-**Verified locally:** PHP 8.4.27, Composer 2.11.1, Laravel 13.40.0; 7 feature tests / 82 assertions passed, including SQLite migrations, database sessions/cache, CSRF and role isolation. Strict Composer validation, PHP lint, route loading and Blade compilation passed. Dependencies target PHP 8.3.33. MySQL, cPanel Apache and browser E2E remain unverified. This branch is a development foundation; confirm the checks below before exposing accounts to other users.
+**Verified locally:** PHP 8.4.27, Composer 2.11.1, Laravel 13.40.0; 20 feature tests / 336 assertions passed, including SQLite migrations, database sessions/cache, CSRF and role isolation. Strict Composer validation, PHP lint, route loading and Blade compilation passed. Dependencies target PHP 8.3.33. Frontend pricing tests (5) and localhost HTTP group/individual flows also pass. MySQL/cPanel Apache remain unverified; Chromium launch was blocked by workspace socket restrictions, so browser E2E is not claimed. This branch is a development foundation; confirm the checks below before exposing accounts to other users.
 
 A Composer lock is included. First install the locked dependencies including dev dependencies, so the feature tests can run. This does not migrate the database or generate accounts automatically:
 
@@ -63,9 +63,9 @@ php artisan view:cache
 
 `storage/` and `bootstrap/cache/` must be writable by your cPanel PHP user. Use the hosting account's ownership/permissions; do not make them world writable. Do not regenerate APP_KEY on later deployments.
 
-Check `/health`, `/account` and `/register`. Create synthetic parent and provider accounts, sign out/in, confirm each lands on its own dashboard and receives 403 on the other role's dashboard and `/admin`. Verify noindex response headers and that `.env` is not accessible through the web. No admin account is seeded and there is no default password.
+Check `/health`, `/account` and `/register`. Create synthetic parent and provider accounts, sign out/in, confirm each lands on its own dashboard and receives 403 on the other role's dashboard and `/admin`. Verify noindex response headers and that `.env` is not accessible through the web. No admin account is seeded and there is no default password. To create a NEW admin interactively after migration, run `php artisan gotry:create-admin`. Passwords are entered in hidden prompts; the command does not promote or overwrite existing accounts.
 
-The dashboard is intentionally a migration status shell. The provider wizard and activity workflows are not ported yet. Legacy D1 users cannot sign in to the new database; there is no import in this batch. Keep the old service unchanged until migration verification and an explicit cutover.
+Providers can create an activity through `/provider/new`, review pricing and submit for approval. Admins review at `/admin`; approved listings appear at `/activities`. Parent interest registration, session management and payments are not yet available. Legacy D1 users cannot sign in to the new database; there is no import in this batch. Keep the old service unchanged until migration verification and an explicit cutover.
 
 ## Subsequent manual updates
 
@@ -80,7 +80,7 @@ The script accepts only `dev`, rejects an unclean checkout, pulls fast-forward, 
 
 ## Next migration batches
 
-1. Port the provider wizard and pricing from the supplied reference images.
-2. Add activity approval, discovery and parent registrations with MySQL transactions and row locking.
-3. Port multi-session capacity, rescheduling, withdrawal/transfer and notification outbox with concurrency tests.
+1. Add parent interest registration and capacity enforcement with MySQL transactions and row locking.
+2. Port multi-session management, rescheduling, withdrawal/transfer and notification outbox with concurrency tests.
+3. Verify MySQL, cPanel Apache and the desktop/mobile browser flows.
 4. Add recovery/email flows and a controlled legacy-data import if required.
