@@ -11,7 +11,7 @@ Artisan::command('gotry:check-database', function (): int {
         $this->error('Deployment requires MySQL/MariaDB with InnoDB. SQLite is for local tests.');
         return Command::FAILURE;
     }
-    $tables = ['users','sessions','cache','cache_locks','activities','activity_events','interests','interest_events'];
+    $tables = ['users','sessions','cache','cache_locks','activities','activity_events','interests','interest_events','notification_outbox','inbox_notifications','account_events'];
     $engines = DB::table('information_schema.TABLES')->where('TABLE_SCHEMA', DB::getDatabaseName())
         ->whereIn('TABLE_NAME', $tables)->pluck('ENGINE', 'TABLE_NAME');
     $valid = true;

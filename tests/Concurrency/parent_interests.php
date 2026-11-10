@@ -7,6 +7,12 @@ use App\Models\Interest;
 use App\Models\InterestEvent;
 use App\Models\User;
 use App\Services\ParentInterests;
+use App\Services\NotificationOutbox;
+use App\Services\AdminAccounts;
+use App\Services\AdminActivityLifecycle;
+use App\Models\OutboxMessage;
+use App\Models\InboxNotification;
+use App\Models\AccountEvent;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
@@ -20,7 +26,7 @@ if (! $app->environment('testing') || config('database.default') !== 'mysql'
     throw new RuntimeException('Requires APP_ENV=testing, mysql driver and an isolated localhost *_test database.');
 }
 DB::statement('SET SESSION innodb_lock_wait_timeout=5');
-$requiredTables = ['activities','interests','interest_events'];
+$requiredTables = ['activities','interests','interest_events','notification_outbox','inbox_notifications','account_events'];
 $engines = DB::table('information_schema.TABLES')->where('TABLE_SCHEMA', DB::getDatabaseName())
     ->whereIn('TABLE_NAME', $requiredTables)->pluck('ENGINE', 'TABLE_NAME');
 foreach ($requiredTables as $table) {
@@ -44,6 +50,15 @@ function executeJob(array $job): array
         }
     }
     try {
+        if ($job['action']==='deliver') return ['status'=>200,'delivered'=>(new NotificationOutbox)->deliver($parent)];
+        if ($job['action']==='access') {
+            $user=(new AdminAccounts)->access($parent,$job['target_id'],['action'=>'suspend','expected_version'=>1,'reason'=>'Concurrency access test']);
+            return ['status'=>200,'id'=>$user->id];
+        }
+        if ($job['action']==='lifecycle') {
+            $activity=(new AdminActivityLifecycle)->change($parent,$job['activity_id'],['action'=>'confirm_minimum','expected_version'=>2]);
+            return ['status'=>200,'id'=>$activity->id];
+        }
         $service = new ParentInterests;
         $interest = $job['action'] === 'register'
             ? $service->register($parent, $job['activity_id'], ['child_name' => $job['name'], 'child_age' => 8, 'expected_activity_version' => 2])
@@ -173,3 +188,45 @@ try {
     check($failed && $interest->fresh()->status === 'withdrawn' && $interest->fresh()->version === 2 && $events($activity) === 2, 'Restore did not roll back on InnoDB.');
 } finally { DB::unprepared('DROP TRIGGER gotry_test_interest_audit_failure'); }
 echo "PASS: InnoDB audit failure rolls back withdrawal and restoration, including versions\n";
+
+$makeUser=fn($role)=>User::create(['name'=>'Isolated '.$role,'email'=>Str::uuid().'@example.test','password'=>'isolated test password!','role'=>$role]);
+$deliveryProvider=$makeUser('provider'); $deliveryParent=$makeUser('parent'); $deliveryOther=$makeUser('parent');
+$activity=$fixture(2); $activity->update(['provider_id'=>$deliveryProvider->id]);
+$service->register($deliveryParent,$activity->id,['child_name'=>'Private A','child_age'=>8,'expected_activity_version'=>2]);
+$service->register($deliveryOther,$activity->id,['child_name'=>'Private B','child_age'=>8,'expected_activity_version'=>2]);
+$results=parallel(array_fill(0,8,['action'=>'deliver','parent_id'=>$deliveryProvider->id]));
+check(array_sum(array_column($results,'delivered'))===2,'Concurrent delivery duplicated acknowledgements.');
+check(InboxNotification::where('recipient_id',$deliveryProvider->id)->count()===2,'Concurrent delivery duplicated notices.');
+check(OutboxMessage::where('recipient_id',$deliveryParent->id)->whereNull('delivered_at')->count()===1,'Another recipient was acknowledged.');
+echo "PASS: eight simultaneous inbox deliveries, exactly two notices and no cross-recipient acknowledgement\n";
+DB::unprepared("CREATE TRIGGER gotry_test_ack_failure BEFORE UPDATE ON notification_outbox FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='ack unavailable'");
+try {
+    $failed=false;
+    try {(new NotificationOutbox)->deliver($deliveryParent);} catch (\Illuminate\Database\QueryException) {$failed=true;}
+    check($failed && InboxNotification::where('recipient_id',$deliveryParent->id)->count()===0,'Failed acknowledgement did not roll back notice insertion.');
+    check(OutboxMessage::where('recipient_id',$deliveryParent->id)->whereNull('delivered_at')->count()===1,'Failed acknowledgement lost pending message.');
+} finally {DB::unprepared('DROP TRIGGER gotry_test_ack_failure');}
+check((new NotificationOutbox)->deliver($deliveryParent)===1 && (new NotificationOutbox)->deliver($deliveryParent)===0,'Pending delivery did not recover.');
+echo "PASS: InnoDB acknowledgement failure rolls back delivery; retry recovers once\n";
+$source=OutboxMessage::where('recipient_id',$deliveryOther->id)->firstOrFail(); $blocked=false;
+try {InboxNotification::create(['id'=>Str::uuid(),'outbox_id'=>$source->id,'recipient_id'=>$deliveryProvider->id,'activity_id'=>$activity->id,'kind'=>$source->kind,'title'=>$source->title,'message'=>$source->message,'created_at'=>$source->getRawOriginal('created_at')]);}
+catch (\Illuminate\Database\QueryException) {$blocked=true;}
+check($blocked,'Composite recipient FK accepted cross-recipient delivery.');
+echo "PASS: InnoDB composite foreign key blocks delivery to the wrong recipient\n";
+
+$admin=$makeUser('admin'); $activity=$fixture(2); $activity->update(['details'=>[...$activity->details,'trial_min'=>2]]);
+$one=$service->register($parents[0],$activity->id,['child_name'=>'Race A','child_age'=>8,'expected_activity_version'=>2]);
+$service->register($parents[1],$activity->id,['child_name'=>'Race B','child_age'=>8,'expected_activity_version'=>2]);
+$results=parallel([['action'=>'lifecycle','parent_id'=>$admin->id,'activity_id'=>$activity->id],['action'=>'withdraw','parent_id'=>$parents[0]->id,'interest_id'=>$one->id,'version'=>1]]);
+check(in_array($results[0]['status'],[200,409],true) && $results[1]['status']===200,'Confirmation/withdrawal race failed.');
+check($active($activity)===1 && $activity->fresh()->status==='pending_registrations','Trial remained proceeding below minimum.');
+check(OutboxMessage::where('activity_id',$activity->id)->count()===6+($results[0]['status']===200?5:0),'Lifecycle race lost or duplicated notifications.');
+echo "PASS: simultaneous minimum confirmation/withdrawal never leaves a below-minimum trial proceeding\n";
+
+$adminA=$makeUser('admin'); $adminB=$makeUser('admin');
+$results=parallel([['action'=>'access','parent_id'=>$adminA->id,'target_id'=>$adminB->id],['action'=>'access','parent_id'=>$adminB->id,'target_id'=>$adminA->id]]);
+$statuses=array_column($results,'status'); sort($statuses);
+check($statuses===[200,403],'Concurrent admin suspension did not recheck the actor.');
+check(User::whereIn('id',[$adminA->id,$adminB->id])->where('is_active',true)->count()===1,'Both concurrent admins were suspended.');
+check(AccountEvent::whereIn('user_id',[$adminA->id,$adminB->id])->count()===1,'Account access audit drift.');
+echo "PASS: simultaneous mutual admin suspensions retain one active admin and one audit event\n";

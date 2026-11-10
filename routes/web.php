@@ -5,6 +5,8 @@ use App\Http\Controllers\ProviderActivityController;
 use App\Http\Controllers\AdminActivityController;
 use App\Http\Controllers\ActivityDiscoveryController;
 use App\Http\Controllers\ParentInterestController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\AdminWorkspaceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +21,8 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 });
 Route::middleware('auth')->group(function (): void {
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])->whereUuid('notification')->name('notifications.read');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
     Route::get('/dashboard', function (Request $request) {
         return redirect()->route(match ($request->user()->role) {
@@ -44,8 +48,14 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/provider/activities/{activity}', [ProviderActivityController::class, 'show'])->whereNumber('activity')->name('provider.activity');
     });
     Route::middleware('role:admin')->group(function (): void {
-        Route::get('/admin', [AdminActivityController::class, 'index'])->name('admin.dashboard');
+        Route::get('/admin', [AdminWorkspaceController::class, 'index'])->name('admin.dashboard');
+        Route::get('/admin/activities', [AdminActivityController::class, 'index'])->name('admin.activities');
+        Route::get('/admin/users', [AdminWorkspaceController::class, 'users'])->name('admin.users');
+        Route::post('/admin/users/{user}/access', [AdminWorkspaceController::class, 'access'])->whereNumber('user')->name('admin.access');
+        Route::get('/admin/audit', [AdminWorkspaceController::class, 'audit'])->name('admin.audit');
+        Route::view('/admin/guide','admin.guide')->name('admin.guide');
         Route::get('/admin/activities/{activity}', [AdminActivityController::class, 'show'])->whereNumber('activity')->name('admin.activity');
         Route::post('/admin/activities/{activity}/decision', [AdminActivityController::class, 'decide'])->whereNumber('activity')->name('admin.decision');
+        Route::post('/admin/activities/{activity}/lifecycle', [AdminActivityController::class, 'lifecycle'])->whereNumber('activity')->name('admin.lifecycle');
     });
 });

@@ -96,5 +96,45 @@ public = Client().get(route)
 assert 'HTTP Private Child Alpha' not in public and 'HTTP Private Child Beta' not in public
 assert db.execute("SELECT COUNT(*) FROM interests WHERE activity_id=? AND status='interested'", (activity_id,)).fetchone()[0] == 1
 assert db.execute('SELECT COUNT(*) FROM interest_events WHERE interest_id IN (SELECT id FROM interests WHERE activity_id=?)', (activity_id,)).fetchone()[0] == 5
-db.close()
 print('PASS: real HTTP signup, CSRF, group capacity, duplicate retries, withdrawal, explicit restore, stale forms, roles, parent isolation and public privacy; one active interest / five audit events')
+
+# Inbox operations use the current account only; no recipient selector is accepted.
+inbox = parent_a.get('/notifications')
+assert 'Your interest was registered' in inbox and 'HTTP Private Child Alpha' not in inbox
+parent_a_id = db.execute('SELECT id FROM users WHERE email=?', (parent_a.email,)).fetchone()[0]
+parent_b_id = db.execute('SELECT id FROM users WHERE email=?', (parent_b.email,)).fetchone()[0]
+notice = db.execute('SELECT id FROM inbox_notifications WHERE recipient_id=? LIMIT 1', (parent_a_id,)).fetchone()[0]
+parent_a.post(f'/notifications/{notice}/read', inbox, {})
+parent_b.post(f'/notifications/{notice}/read', parent_b.get('/parent'), {}, expected=404)
+provider_inbox = provider.get('/notifications')
+assert 'A new interest was registered' in provider_inbox and 'HTTP Private Child Alpha' not in provider_inbox
+assert db.execute('SELECT COUNT(*) FROM inbox_notifications WHERE recipient_id=?', (provider_id,)).fetchone()[0] == 5
+print('PASS: real HTTP in-app delivery, read state and cross-recipient denial')
+
+# Test-fixture promotion ONLY, inside the guarded disposable SQLite database.
+# There is no public role-change endpoint in the application.
+db.execute("UPDATE users SET role='admin' WHERE id=?", (parent_b_id,))
+admin_activity = db.execute('INSERT INTO activities(provider_id,submission_token,title,category,status,version,details,submitted_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',
+    (provider_id, str(uuid.uuid4()), 'HTTP Admin Trial', 'Music', 'pending_approval', 1, json.dumps(details), now.isoformat(), now.isoformat(), now.isoformat())).lastrowid
+db.commit()
+assert 'Super admin workspace' in parent_b.get('/admin')
+review_route = f'/admin/activities/{admin_activity}'
+parent_b.post(review_route + '/decision', parent_b.get(review_route), {'action': 'approve', 'expected_version': 1})
+parent_b.post(f'/admin/users/{parent_a_id}/access', parent_b.get('/admin/users'), {'action': 'suspend', 'expected_version': 1, 'reason': 'HTTP account review'})
+assert 'Welcome back' in parent_a.get('/parent')
+parent_b.post(f'/admin/users/{parent_a_id}/access', parent_b.get('/admin/users'), {'action': 'activate', 'expected_version': 2, 'reason': 'HTTP review complete'})
+parent_a.post('/login', parent_a.get('/account'), {'email': parent_a.email, 'password': 'HTTP test password!'})
+new_route = f'/activities/{admin_activity}'
+parent_a.post(new_route + '/interest', parent_a.get(new_route), {**payload, 'child_name': 'HTTP Admin Child'})
+parent_b.post(review_route + '/lifecycle', parent_b.get(review_route), {'action': 'confirm_minimum', 'expected_version': 2})
+assert db.execute('SELECT status FROM activities WHERE id=?', (admin_activity,)).fetchone()[0] == 'proceeding_pending_payments'
+new_interest = db.execute('SELECT id FROM interests WHERE activity_id=?', (admin_activity,)).fetchone()[0]
+parent_a.post(f'/parent/interests/{new_interest}/withdraw', parent_a.get('/parent'), {'expected_version': 1, 'withdraw_confirm': 1})
+assert db.execute('SELECT status FROM activities WHERE id=?', (admin_activity,)).fetchone()[0] == 'pending_registrations'
+parent_b.post(review_route + '/lifecycle', parent_b.get(review_route), {'action': 'cancel_admin', 'expected_version': 4, 'reason': 'HTTP venue unavailable'})
+assert db.execute('SELECT status FROM activities WHERE id=?', (admin_activity,)).fetchone()[0] == 'cancelled_by_admin'
+assert 'HTTP account review' in parent_b.get('/admin/audit?type=account')
+assert 'minimum_lost' in parent_b.get('/admin/audit?type=activity')
+assert 'HTTP Admin Child' not in parent_b.get('/admin/audit?type=interest')
+db.close()
+print('PASS: real HTTP super-admin overview, approval, suspension/reactivation, lifecycle, minimum loss and audit privacy')
