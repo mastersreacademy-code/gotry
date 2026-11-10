@@ -16,6 +16,7 @@
         <a href="{{ route('activities.index') }}">Explore</a>
         @auth
             <a href="{{ route('dashboard') }}">Dashboard</a>
+            <a href="{{ route('notifications.index') }}">Notifications</a>
             <form method="post" action="{{ route('logout') }}">@csrf<button class="secondary" type="submit">Sign out</button></form>
         @else
             <a href="{{ route('login') }}">Sign in</a>

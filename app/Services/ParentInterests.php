@@ -6,6 +6,7 @@ use App\Models\Activity;
 use App\Models\Interest;
 use App\Models\InterestEvent;
 use App\Models\User;
+use App\Models\ActivityEvent;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -28,6 +29,7 @@ class ParentInterests
     private function closedReason(Activity $activity): ?string
     {
         if ($activity->status !== 'pending_registrations') return 'This activity is not accepting interest.';
+        if (! User::whereKey($activity->provider_id)->where('is_active',true)->exists()) return 'The provider is currently unavailable.';
         $data = $activity->details;
         $today = CarbonImmutable::now('Australia/Sydney');
         if (! isset($data['deadline']) || ! $this->validDate($data['deadline']) || $data['deadline'] < $today->toDateString()) return 'The registration deadline has passed.';
@@ -51,7 +53,7 @@ class ParentInterests
 
     private function assertParent(User $parent): void
     {
-        abort_unless($parent->role === 'parent', 403);
+        abort_unless($parent->role === 'parent' && $parent->is_active, 403);
     }
 
     private function lockActivity(int $activityId): Activity
@@ -73,10 +75,11 @@ class ParentInterests
         abort_unless($availability['open'], 409, $availability['reason'] ?? 'Trial unavailable.');
     }
 
-    private function record(Interest $interest, User $actor, string $action, ?string $from): void
+    private function record(Interest $interest, User $actor, string $action, ?string $from, Activity $activity): void
     {
-        InterestEvent::create(['interest_id' => $interest->id, 'actor_id' => $actor->id, 'action' => $action,
+        $event = InterestEvent::create(['interest_id' => $interest->id, 'actor_id' => $actor->id, 'action' => $action,
             'from_status' => $from, 'to_status' => $interest->status, 'version' => $interest->version]);
+        app(NotificationOutbox::class)->interest($event, $interest, $activity);
     }
 
     public function register(User $parent, int $activityId, array $input): Interest
@@ -98,7 +101,7 @@ class ParentInterests
             $this->assertAccepting($activity, (int) $data['expected_activity_version'], (int) $data['child_age']);
             $interest = Interest::create(['activity_id' => $activity->id, 'parent_id' => $parent->id, 'child_name' => $data['child_name'],
                 'child_key' => $key, 'child_age' => $data['child_age'], 'status' => 'interested', 'version' => 1, 'activity_version' => $activity->version]);
-            $this->record($interest, $parent, 'registered', null);
+            $this->record($interest, $parent, 'registered', null, $activity);
             return $interest;
         }, 5);
     }
@@ -124,7 +127,14 @@ class ParentInterests
             $interest->update(['status' => $target, 'version' => $interest->version + 1,
                 'activity_version' => $action === 'restore' ? $activity->version : $interest->activity_version,
                 'withdrawn_at' => $action === 'withdraw' ? now() : null]);
-            $this->record($interest, $parent, $action === 'withdraw' ? 'withdrawn' : 'restored', $from);
+            $this->record($interest, $parent, $action === 'withdraw' ? 'withdrawn' : 'restored', $from, $activity);
+            if ($action === 'withdraw' && $activity->status === 'proceeding_pending_payments' && ($activity->details['trial_type'] ?? '') === 'group'
+                && Interest::where('activity_id',$activity->id)->where('status','interested')->count() < (int)$activity->details['trial_min']) {
+                $activity->update(['status'=>'pending_registrations','version'=>$activity->version+1,'review_reason'=>'Interest fell below the required minimum; admin review is needed.']);
+                $event = ActivityEvent::create(['activity_id'=>$activity->id,'actor_id'=>$parent->id,'action'=>'minimum_lost',
+                    'from_status'=>'proceeding_pending_payments','to_status'=>'pending_registrations','reason'=>'Interest fell below the required minimum.']);
+                app(NotificationOutbox::class)->activity($event,$activity);
+            }
             return $interest;
         }, 5);
     }

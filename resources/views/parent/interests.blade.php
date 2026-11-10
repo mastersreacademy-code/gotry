@@ -13,6 +13,7 @@
         <h2>@if($activity->status === 'pending_registrations')<a href="{{ route('activities.show', $activity) }}">{{ $activity->title }}</a>@else{{ $activity->title }}@endif</h2>
         <p>{{ $interest->child_name }} · Age {{ $interest->child_age }}</p>
         <p>Activity status: {{ $activity->statusLabel() }}</p>
+        @if(($activity->details['trial_type'] ?? '')==='group')<p>{{ $activity->details['trial_date'] }} · {{ $activity->details['trial_time'] }} (Sydney)</p>@endif
         @if($interest->status === 'interested')
             <form method="post" action="{{ route('parent.withdraw', $interest) }}">@csrf
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">

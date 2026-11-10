@@ -4,7 +4,7 @@
 
 Approved activity pages show aggregate interest and remaining group places. A parent signs in, provides a child's first name/nickname and age, reviews the details and registers free interest. This does not confirm a booking or collect payment.
 
-The parent dashboard lists only that parent's registrations. Withdrawing requires explicit confirmation and releases a group place. Restoring requires reviewing current activity details, current availability and the child's age eligibility. Individual trials collect separate enquiries; they do not share a single group seat. Waiting lists, trial confirmation, payment requests, multi-session scheduling and notifications are not part of this batch.
+The parent dashboard lists only that parent's registrations. Withdrawing requires explicit confirmation and releases a group place. Restoring requires reviewing current activity details, current availability and the child's age eligibility. Individual trials collect separate enquiries; they do not share a single group seat. Waiting lists, payment requests and multi-session scheduling remain unavailable. Super admins can now mark group trials proceeding or cancel them; minimum-loss withdrawals return proceeding trials to review. In-app notifications are queued with the source change.
 
 Within one parent account/activity, names are whitespace-normalized and lowercased for a unique hashed child key. A repeated active submission returns the existing interest without another audit event. This nickname-based identity is not a verified global child identity. Another parent's registrations never appear on a parent dashboard or public page; providers currently receive no child roster through these pages.
 
@@ -23,8 +23,8 @@ Apply `2026_11_10_000003_create_parent_interests.php` with `php artisan migrate 
 
 ## Actual verification
 
-- 33 Laravel feature tests / 527 assertions pass on PHP 8.4.27 and SQLite, including registration/restore capacity, duplicate retries, stale versions, deadlines/ages/roles, CSRF, throttling, XSS escaping, account isolation, and audit-failure rollback for all three writes.
-- All three Laravel migrations passed on isolated MariaDB 11.8.6. The real service was exercised by separate PHP processes behind a start barrier: eight parents competing for two places; eight simultaneous duplicate submissions; withdrawal versus new registration; and restore versus new registration. Capacity and audit counts remained consistent.
+- 54 Laravel feature tests / 728 assertions pass on PHP 8.4.27 and SQLite, including registration/restore capacity, duplicate retries, stale versions, deadlines/ages/roles, CSRF, throttling, XSS escaping, account isolation, and audit-failure rollback for all three writes.
+- All five Laravel migrations passed on isolated MariaDB 11.8.6. The real service was exercised by separate PHP processes behind a start barrier: eight parents competing for two places; eight simultaneous duplicate submissions; withdrawal versus new registration; and restore versus new registration. Capacity and audit counts remained consistent.
 - MariaDB trigger failures proved registration, withdrawal and restoration—including their versions—roll back when audit insertion fails. The InnoDB deployment check passed.
 - Real localhost HTTP signup/registration/withdrawal/restore checks passed with database sessions and CSRF, including parent isolation and public privacy.
 - The actual cPanel MySQL/MariaDB version and Apache are not verified. Browser layout/E2E remains pending because Chromium could not launch under workspace socket restrictions in the preceding batch.

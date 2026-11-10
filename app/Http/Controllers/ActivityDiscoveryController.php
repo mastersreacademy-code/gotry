@@ -12,7 +12,7 @@ class ActivityDiscoveryController
 {
     public function index()
     {
-        return view('activities.index', ['activities' => Activity::where('status', 'pending_registrations')->latest('id')->paginate(20)]);
+        return view('activities.index', ['activities' => Activity::where('status', 'pending_registrations')->whereHas('provider',fn($query)=>$query->where('is_active',true))->latest('id')->paginate(20)]);
     }
 
     public function show(Request $request, Activity $activity, ProgrammePricing $pricing, ParentInterests $interests)

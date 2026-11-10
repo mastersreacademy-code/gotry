@@ -44,7 +44,7 @@ class AuthController
             'email' => ['required', 'string', 'email', 'max:254'],
             'password' => ['required', 'string', 'max:128'],
         ]);
-        if (! Auth::attempt($credentials)) {
+        if (! Auth::attempt([...$credentials, 'is_active' => true])) {
             throw ValidationException::withMessages(['email' => 'The email or password is incorrect.']);
         }
         $request->session()->regenerate();
