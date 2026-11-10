@@ -20,6 +20,7 @@ git pull --ff-only origin dev
 composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 php artisan optimize:clear
 php artisan migrate --force
+php artisan gotry:check-database
 php artisan config:cache
 php artisan view:cache
 echo 'GoTry dev update complete. Verify /health and parent/provider signup.'

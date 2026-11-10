@@ -14,6 +14,28 @@
     @elseif(!empty($details['class_times']))<p class="preserve-lines">{{ $details['class_times'] }}</p>
     @else<p>{{ $details['regular_day'] }} · {{ $details['regular_time'] }}</p>@endif
     @include('provider.partials.prices')
-    <p class="notice">Online interest registration is being migrated. Bookings and payments are not available yet.</p>
+    <section class="registration-section">
+        <h2>Register interest for the trial</h2>
+        @if($availability['capacity'] !== null)
+            <p>{{ $availability['count'] }} registered · {{ $availability['remaining'] }} places remaining (maximum {{ $availability['capacity'] }})</p>
+            <p>Minimum {{ $details['trial_min'] }} participants needed. {{ $availability['minimum_reached'] ? 'Minimum interest reached; this is not yet a confirmed booking.' : 'The trial will only proceed when the required minimum is reached and confirmed.' }}</p>
+        @else<p>Individual trial: register an enquiry and the provider will arrange availability. There is no shared group-seat limit.</p>@endif
+        @if($mine->isNotEmpty())<p>Your registrations: @foreach($mine as $interest){{ $interest->child_name }} ({{ $interest->status === 'interested' ? 'registered' : 'withdrawn' }})@unless($loop->last), @endunless @endforeach. <a href="{{ route('parent.dashboard') }}">Manage on your dashboard</a>.</p>@endif
+        @if($errors->any())<div class="error" role="alert">{{ $errors->first() }}</div>@endif
+        @if(! $availability['open'])<p class="notice">{{ $availability['reason'] }}</p>
+        @elseif(auth()->user()?->role === 'parent')
+            <form method="post" action="{{ route('parent.interest', $activityId) }}">@csrf
+                <input type="hidden" name="expected_activity_version" value="{{ $activityVersion }}">
+                <div class="fields">
+                    <div><label for="child_name">Child's first name or nickname</label><input id="child_name" name="child_name" maxlength="80" value="{{ old('child_name') }}" required autocomplete="off"></div>
+                    <div><label for="child_age">Child's age</label><input id="child_age" name="child_age" type="number" min="{{ $details['min_age'] }}" max="{{ $details['max_age'] }}" value="{{ old('child_age') }}" required></div>
+                </div>
+                <label class="check-row"><input type="checkbox" name="interest_terms" value="1" required> I have reviewed the activity details. I understand this is free interest registration, not a confirmed booking or payment.</label>
+                <button type="submit">Register interest →</button>
+            </form>
+        @elseif(auth()->guest())<a class="button" href="{{ route('login') }}">Sign in as a parent to register interest</a>
+        @else<p>Parent accounts can register a child's interest. Your account is {{ auth()->user()->role }}.</p>@endif
+    </section>
+    <p class="text-small">No payment is collected here. Trial confirmation, session management and payment requests are still being migrated.</p>
 </section>
 @endsection
