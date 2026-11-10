@@ -13,6 +13,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Paginator::defaultView('partials.pagination');
+        RateLimiter::for('interest-writes', fn (Request $request) => Limit::perMinute(30)->by((string) $request->user()->id));
         RateLimiter::for('signup', fn (Request $request) => Limit::perMinute(5)->by($request->ip()));
         RateLimiter::for('login', fn (Request $request) => [
             Limit::perMinute(20)->by('ip:'.$request->ip()),

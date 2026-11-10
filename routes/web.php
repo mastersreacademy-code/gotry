@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ProviderActivityController;
 use App\Http\Controllers\AdminActivityController;
 use App\Http\Controllers\ActivityDiscoveryController;
+use App\Http\Controllers\ParentInterestController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -27,7 +28,14 @@ Route::middleware('auth')->group(function (): void {
             default => abort(403),
         });
     })->name('dashboard');
-    Route::view('/parent', 'dashboard', ['role' => 'parent'])->middleware('role:parent')->name('parent.dashboard');
+    Route::middleware('role:parent')->group(function (): void {
+        Route::get('/parent', [ParentInterestController::class, 'index'])->name('parent.dashboard');
+        Route::middleware('throttle:interest-writes')->group(function (): void {
+            Route::post('/activities/{activity}/interest', [ParentInterestController::class, 'store'])->whereNumber('activity')->block(10, 10)->name('parent.interest');
+            Route::post('/parent/interests/{interest}/withdraw', [ParentInterestController::class, 'withdraw'])->whereNumber('interest')->block(10, 10)->name('parent.withdraw');
+            Route::post('/parent/interests/{interest}/restore', [ParentInterestController::class, 'restore'])->whereNumber('interest')->block(10, 10)->name('parent.restore');
+        });
+    });
     Route::middleware('role:provider')->group(function (): void {
         Route::get('/provider', [ProviderActivityController::class, 'index'])->name('provider.dashboard');
         Route::get('/provider/new/{step?}', [ProviderActivityController::class, 'create'])->where('step', '[1-5]')->block(10, 10)->name('provider.create');
