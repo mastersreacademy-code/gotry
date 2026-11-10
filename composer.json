@@ -18,7 +18,10 @@
     "psr-4": {
       "App\\": "app/",
       "Database\\Seeders\\": "database/seeders/"
-    }
+    },
+    "exclude-from-classmap": [
+      "vendor/league/flysystem/src/Local/"
+    ]
   },
   "autoload-dev": {
     "psr-4": {
