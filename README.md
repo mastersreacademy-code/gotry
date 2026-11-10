@@ -5,13 +5,24 @@ Development is moving to **Laravel 13 / PHP 8.3+ / MySQL** on cPanel, on the `de
 ## Migration status
 
 - Laravel application entry points, configuration, MySQL-compatible auth/session/cache migrations, Blade pages and parent/provider authentication are implemented.
-- Role-protected parent/provider/admin dashboard shells are implemented. Admin self-registration is forbidden.
-- Existing Worker code in `src/`, D1 SQL in `migrations/`, Node/Python tests and earlier documentation are **legacy references**, not the PHP backend. `php artisan migrate` uses only `database/migrations/`.
-- Activities, provider wizard, approvals, registration capacity, schedules, notification outbox, account recovery and email verification still require migration. No automatic import of D1 accounts or activity data is included.
+- The provider five-step wizard, session-scoped drafts, trial/regular format separation, schedule choices, pricing/discount previews, provider declarations and idempotent submission are implemented.
+- Providers can see their own activities. Admins can approve/reject with a reason; transitions and their audit events commit atomically. Approved activities have public pages that exclude private business contacts. Admin self-registration is forbidden; `php artisan gotry:create-admin` creates a new admin interactively.
+- Existing Worker code in `src/`, D1 SQL in `migrations/`, earlier Node/Python tests and deployment documentation are **legacy references**, not the PHP backend. `php artisan migrate` uses only `database/migrations/`.
+- Parent registrations, multi-session capacity and lifecycle operations, notification outbox, account recovery and email verification still require migration. No automatic import of D1 accounts or activity data is included.
 - Noindex is enforced in Laravel middleware, page metadata and Apache headers; robots.txt disallows crawling.
 
 ## Validation
 
-`composer test` runs Laravel feature tests using an in-memory SQLite database. PHP 8.3+, Composer and PDO SQLite are needed for tests; PDO MySQL is needed for hosting. Verified with isolated PHP 8.4.27 and Composer 2.11.1: 7 Laravel feature tests / 82 assertions pass; PHP lint, route loading, Blade compilation and strict Composer validation pass. Composer platform targets PHP 8.3.33. MySQL and cPanel/Apache have not yet been exercised. Do not treat legacy Node/Python results as Laravel test results.
+`composer test` runs Laravel feature tests using an in-memory SQLite database. PHP 8.3+, Composer and PDO SQLite are needed for tests; PDO MySQL is needed for hosting. Verified with isolated PHP 8.4.27 and Composer 2.11.1: 20 Laravel feature tests / 336 assertions pass; PHP lint, route loading, Blade compilation and strict Composer validation pass. Composer platform targets PHP 8.3.33. Five frontend pricing tests and group/individual HTTP signup-to-submission smoke tests also pass. MySQL and cPanel/Apache remain unverified. Chromium could not launch because the workspace blocks a required socket, so browser layout/E2E is not claimed. Do not treat legacy Node/Python results as Laravel test results.
 
 A verified `composer.lock` is included; use `composer install`, not `composer update`, for installation and repeat deployments. No GitHub Actions or automatic deployment is configured by this migration.
+
+Additional local checks (not required on the cPanel host):
+
+```bash
+node --test tests/programme-pricing.test.mjs
+python3 tests/http_provider_smoke.py http://127.0.0.1:8123
+GOTRY_TEST_URL=http://127.0.0.1:8123 node tests/Browser/provider-wizard.cjs
+```
+
+The HTTP/browser scripts create synthetic provider accounts and listings; use an isolated, migrated localhost database with `SESSION_SECURE_COOKIE=false` for HTTP testing. The browser script requires Playwright and a working Chromium installation.

@@ -13,6 +13,7 @@
     <a class="brand" href="{{ route('home') }}">Go<span>Try</span></a>
     <nav aria-label="Main navigation">
         <a href="{{ route('home') }}">Home</a>
+        <a href="{{ route('activities.index') }}">Explore</a>
         @auth
             <a href="{{ route('dashboard') }}">Dashboard</a>
             <form method="post" action="{{ route('logout') }}">@csrf<button class="secondary" type="submit">Sign out</button></form>
