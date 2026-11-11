@@ -32,7 +32,7 @@
                 </div>
             @endforeach
             </div>
-            @if($step === 3)<p class="notice"><strong>Trial lesson fee: Free.</strong> You provide the introductory lesson at no charge. Any GoTry reservation fee is separate and is only requested when the trial can proceed. One introductory trial per child, activity and provider.</p>@endif
+            @if($step === 3)<p class="notice"><strong>Trial lesson fee: Free.</strong> You provide the introductory lesson at no charge. Group trial sessions share the duration, registration deadline and per-session group limits. Any GoTry reservation fee is separate and is only requested when the trial can proceed. One introductory trial per child, activity and provider.</p>@endif
             @if($step === 4)<section id="price-preview" aria-label="Parent price preview" aria-live="polite"></section><p>Discounts apply once to the first term or first lesson, as selected. Trial reservation fees are separate.</p>@endif
         @else
             @include('provider.partials.review')

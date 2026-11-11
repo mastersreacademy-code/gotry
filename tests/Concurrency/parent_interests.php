@@ -61,7 +61,7 @@ function executeJob(array $job): array
         }
         $service = new ParentInterests;
         $interest = $job['action'] === 'register'
-            ? $service->register($parent, $job['activity_id'], ['child_name' => $job['name'], 'child_age' => 8, 'expected_activity_version' => 2])
+            ? $service->register($parent, $job['activity_id'], ['child_name' => $job['name'], 'child_age' => 8, 'expected_activity_version' => 2, 'trial_session' => $job['trial_session'] ?? null])
             : $service->change($parent, $job['interest_id'], $job['action'], ['expected_version' => $job['version'], 'expected_activity_version' => 2]);
         return ['status' => 200, 'id' => $interest->id, 'version' => $interest->version];
     } catch (HttpExceptionInterface $exception) {
@@ -123,6 +123,22 @@ $fixture = function (int $capacity) use ($provider): Activity {
 $job = fn (User $parent, Activity $activity, string $name) => ['action' => 'register', 'parent_id' => $parent->id, 'activity_id' => $activity->id, 'name' => $name];
 $active = fn (Activity $activity) => Interest::where('activity_id', $activity->id)->where('status', 'interested')->count();
 $events = fn (Activity $activity) => InterestEvent::whereIn('interest_id', Interest::where('activity_id', $activity->id)->select('id'))->count();
+
+$multi = $fixture(1);
+$multi->update(['details' => [...$multi->details, 'extra_trial_times' => $multi->details['trial_date'].' 11:00']]);
+$jobs = [];
+foreach ($parents as $index => $parent) {
+    $jobs[] = [...$job($parent, $multi, 'Session child '.$parent->id), 'trial_session' => 1 + ($index % 2)];
+}
+$results = parallel($jobs);
+check(count(array_filter($results, fn ($result) => $result['status'] === 200)) === 2, 'Parallel session capacity did not accept exactly two.');
+check(count(array_filter($results, fn ($result) => $result['status'] === 409)) === 6, 'Parallel session capacity did not reject six.');
+foreach ([1, 2] as $session) {
+    check((new ParentInterests)->activeInterests($multi, $session)->count() === 1, 'A trial session was overbooked.');
+}
+check($events($multi) === 2, 'Session race duplicated interest events.');
+check(OutboxMessage::where('activity_id', $multi->id)->count() === 4, 'Session race wrote inconsistent notifications.');
+echo "PASS: eight simultaneous parents across two sessions, one seat and two notices per session\n";
 
 $activity = $fixture(2);
 $results = parallel(array_map(fn ($parent) => $job($parent, $activity, 'Child '.$parent->id), $parents));

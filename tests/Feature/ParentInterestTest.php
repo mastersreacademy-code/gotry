@@ -80,6 +80,83 @@ class ParentInterestTest extends TestCase
         $this->get('/activities/'.$activity->id)->assertOk()->assertSee('0 places remaining')->assertSee('This trial is full');
     }
 
+    public function test_multi_session_capacity_duplicate_child_and_restoration_use_the_original_slot(): void
+    {
+        $activity = $this->activity(['trial_max' => 1, 'extra_trial_times' => '2026-12-11 10:00']);
+        $url = '/activities/'.$activity->id.'/interest';
+        $first = $this->user();
+        $second = $this->user();
+        $firstSlot = [...$this->registration('Private Alpha'), 'trial_session' => 1];
+        $secondSlot = [...$this->registration('Private Beta'), 'trial_session' => 2];
+        $this->actingAs($first)->get('/activities/'.$activity->id)->assertOk()->assertSee('Choose a session');
+        $this->post($url, $this->registration())->assertStatus(409);
+        $this->post($url, [...$firstSlot, 'trial_session' => 3])->assertStatus(409);
+        $this->post($url, $firstSlot)->assertRedirect();
+        $this->post($url, $firstSlot)->assertRedirect();
+        $this->post($url, [...$firstSlot, 'trial_session' => 2])->assertStatus(409);
+        $interest = Interest::firstOrFail();
+        $this->actingAs($second)->post($url, [...$secondSlot, 'trial_session' => 1])->assertStatus(409);
+        $this->post($url, $secondSlot)->assertRedirect();
+        $this->get('/parent')->assertOk()->assertSee('2026-12-11 10:00')->assertDontSee('Private Alpha');
+        $this->post('/parent/interests/'.$interest->id.'/withdraw', ['withdraw_confirm' => 1, 'expected_version' => 1])->assertNotFound();
+        $this->actingAs($first)->post('/parent/interests/'.$interest->id.'/withdraw', ['withdraw_confirm' => 1, 'expected_version' => 1])->assertRedirect();
+        $restore = ['interest_terms' => 1, 'expected_version' => 2, 'expected_activity_version' => 2, 'trial_session' => 2];
+        $this->post('/parent/interests/'.$interest->id.'/restore', $restore)->assertRedirect();
+        $this->post('/parent/interests/'.$interest->id.'/restore', $restore)->assertRedirect();
+        $this->assertSame(1, $interest->fresh()->trial_session);
+        $this->assertDatabaseCount('interests', 2);
+        $this->assertDatabaseCount('interest_events', 4);
+        $this->assertDatabaseCount('notification_outbox', 8);
+        $notices = \App\Models\OutboxMessage::where('recipient_id', $activity->provider_id)->get();
+        $this->assertStringContainsString('2026-12-10 09:00', $notices->firstWhere('kind', 'provider_restored')->message);
+        foreach ($notices as $notice) {
+            $this->assertStringNotContainsString('Private Alpha', $notice->message);
+            $this->assertStringNotContainsString('Private Beta', $notice->message);
+        }
+    }
+
+    public function test_session_confirmation_and_minimum_loss_notify_only_the_affected_session_atomically(): void
+    {
+        $activity = $this->activity(['trial_min' => 2, 'extra_trial_times' => '2026-12-11 10:00']);
+        $a = $this->user();
+        $b = $this->user();
+        $c = $this->user();
+        $service = app(ParentInterests::class);
+        $interest = $service->register($a, $activity->id, [...$this->registration('First child'), 'trial_session' => 1]);
+        $service->register($c, $activity->id, [...$this->registration('Other session'), 'trial_session' => 2]);
+        $url = '/admin/activities/'.$activity->id.'/lifecycle';
+        $admin = $this->user('admin');
+        $confirm = ['action' => 'confirm_minimum', 'expected_version' => 2, 'trial_session' => 1];
+        $this->actingAs($admin)->post($url, $confirm)->assertStatus(409);
+        $this->post($url, [...$confirm, 'trial_session' => null])->assertStatus(422);
+        $service->register($b, $activity->id, [...$this->registration('Second child'), 'trial_session' => 1]);
+        $this->post($url, $confirm)->assertRedirect();
+        $this->post($url, $confirm)->assertStatus(409);
+        $this->assertDatabaseHas('activity_events', ['trial_session' => 1, 'action' => 'confirm_minimum']);
+        $this->assertEqualsCanonicalizing([$a->id, $b->id], \App\Models\OutboxMessage::where('kind', 'parent_trial_proceeding')->pluck('recipient_id')->all());
+        $this->get('/admin/audit')->assertOk()->assertSee('Trial session 1');
+        $this->get('/admin/activities/'.$activity->id)->assertOk()->assertSee('Proceeding');
+        $this->assertSame('pending_registrations', $activity->fresh()->status);
+        $withdraw = '/parent/interests/'.$interest->id.'/withdraw';
+        DB::statement("CREATE TRIGGER fail_session_notice BEFORE INSERT ON notification_outbox WHEN NEW.kind='parent_trial_review' BEGIN SELECT RAISE(ABORT,'outbox unavailable'); END");
+        $this->actingAs($a)->post($withdraw, ['withdraw_confirm' => 1, 'expected_version' => 1])->assertStatus(500);
+        $this->assertSame('interested', $interest->fresh()->status);
+        $this->assertSame(3, $activity->fresh()->version);
+        $this->assertDatabaseCount('activity_events', 1);
+        $this->assertDatabaseCount('interest_events', 3);
+        $this->assertDatabaseCount('notification_outbox', 9);
+        DB::statement('DROP TRIGGER fail_session_notice');
+        $this->post($withdraw, ['withdraw_confirm' => 1, 'expected_version' => 1])->assertRedirect();
+        $this->assertSame('pending_registrations', \App\Services\TrialSchedule::status($activity->fresh(), 1));
+        $this->assertDatabaseHas('activity_events', ['trial_session' => 1, 'action' => 'minimum_lost']);
+        $this->assertSame([$b->id], \App\Models\OutboxMessage::where('kind', 'parent_trial_review')->pluck('recipient_id')->all());
+        $this->actingAs($admin)->post($url, ['action' => 'cancel_admin', 'reason' => 'Venue closed', 'expected_version' => 4, 'trial_session' => 1])->assertRedirect();
+        $this->assertSame([$b->id], \App\Models\OutboxMessage::where('kind', 'parent_trial_cancelled')->pluck('recipient_id')->all());
+        $this->actingAs($c)->get('/parent')->assertOk()->assertSee('2026-12-11 10:00')->assertDontSee('Cancelled by Admin');
+        $this->actingAs($admin)->post($url, ['action' => 'cancel_admin', 'reason' => 'Venue closed', 'expected_version' => 5])->assertRedirect();
+        $this->assertEqualsCanonicalizing([$b->id, $c->id], \App\Models\OutboxMessage::where('kind', 'parent_trial_cancelled')->pluck('recipient_id')->all());
+    }
+
     public function test_individual_trials_collect_separate_enquiries_without_a_shared_one_child_limit(): void
     {
         $activity = $this->activity(['trial_type' => 'individual', 'trial_availability' => 'Weekdays']);

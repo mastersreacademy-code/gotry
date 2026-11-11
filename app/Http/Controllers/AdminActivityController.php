@@ -9,6 +9,7 @@ use App\Services\ProgrammePricing;
 use App\Services\NotificationOutbox;
 use App\Services\AdminActivityLifecycle;
 use App\Services\ParentInterests;
+use App\Services\TrialSchedule;
 use App\Models\User;
 use App\Models\Interest;
 use Illuminate\Http\Request;
@@ -26,9 +27,9 @@ class AdminActivityController
         return view('admin.activities', ['activities' => $query->paginate(30)->withQueryString()]);
     }
 
-    public function show(Activity $activity, ActivityDraft $schema, ProgrammePricing $pricing, ProviderActivityController $provider)
+    public function show(Activity $activity, ActivityDraft $schema, ProgrammePricing $pricing, ProviderActivityController $provider, ParentInterests $interests)
     {
-        return view('admin.review', ['activity' => $activity, 'review' => $provider->review($schema, $activity->details), 'prices' => $pricing->preview($activity->details),
+        return view('admin.review', ['activity' => $activity, 'sessions' => $interests->sessionSummary($activity), 'review' => $provider->review($schema, $activity->details), 'prices' => $pricing->preview($activity->details),
             'interestCount'=>Interest::where('activity_id',$activity->id)->where('status','interested')->count()]);
     }
 
@@ -44,8 +45,10 @@ class AdminActivityController
             if ($data['action'] === 'approve') {
                 abort_unless(User::whereKey($locked->provider_id)->where('is_active',true)->exists(),409,'The provider account is suspended.');
                 $candidate = clone $locked; $candidate->status='pending_registrations';
-                $available = app(ParentInterests::class)->availability($candidate);
-                abort_unless($available['open'],409,$available['reason'] ?? 'The trial cannot accept registrations.');
+                foreach (array_keys(TrialSchedule::sessions($candidate)) ?: [null] as $session) {
+                    $available = app(ParentInterests::class)->availability($candidate, session: $session);
+                    abort_unless($available['open'], 409, $available['reason'] ?? 'The trial cannot accept registrations.');
+                }
             }
             $reason = $data['action'] === 'reject' ? $data['reason'] : null;
             $locked->update(['status' => $status, 'version' => $locked->version + 1, 'review_reason' => $reason, 'reviewed_at' => now()]);

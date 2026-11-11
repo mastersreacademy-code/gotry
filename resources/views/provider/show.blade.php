@@ -8,5 +8,6 @@
     @if($activity->review_reason)<p class="notice"><strong>Admin feedback:</strong> {{ $activity->review_reason }}</p>@endif
     @include('provider.partials.review')
     @include('provider.partials.prices')
+    @include('provider.partials.trial-sessions')
 </section>
 @endsection

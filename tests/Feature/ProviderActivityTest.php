@@ -73,6 +73,22 @@ class ProviderActivityTest extends TestCase
         $this->actingAs($this->user('parent'))->get('/provider/new')->assertForbidden();
     }
 
+    public function test_provider_submits_multiple_trial_times_and_admin_approves_the_listing(): void
+    {
+        $provider = $this->user();
+        $steps = $this->steps();
+        $steps[3]['extra_trial_times'] = "2027-01-11 10:30\r\n2027-01-12 11:30";
+        $token = $this->draft($provider, $steps);
+        $this->get('/provider/new/5')->assertSee('2027-01-12 11:30');
+        $this->post('/provider/submit', $this->submit($token))->assertRedirect('/provider/activities/1');
+        $this->assertSame("2027-01-11 10:30\n2027-01-12 11:30", Activity::firstOrFail()->details['extra_trial_times']);
+        $this->get('/provider/activities/1')->assertOk()->assertSee('Group trial sessions')->assertSee('2027-01-11 10:30');
+        $this->actingAs($this->user('admin'))->get('/admin/activities/1')->assertOk()->assertSee('2027-01-12 11:30');
+        $this->post('/admin/activities/1/decision', ['action' => 'approve', 'expected_version' => 1])->assertRedirect();
+        $this->get('/activities/1')->assertOk()->assertSee('2027-01-12 11:30')->assertDontSee('private-contact@example.test')
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
     public function test_steps_cannot_be_skipped_and_invalid_input_is_not_saved(): void
     {
         $provider = $this->user();
@@ -116,6 +132,10 @@ class ProviderActivityTest extends TestCase
         $cases = [
             [2, [...$this->steps()[2], 'max_age' => 5], 'max_age'],
             [3, [...$this->steps()[3], 'trial_max' => 7], 'trial_max'],
+            [3, [...$this->steps()[3], 'extra_trial_times' => $this->steps()[3]['trial_date'].' 09:00'], 'extra_trial_times'],
+            [3, [...$this->steps()[3], 'extra_trial_times' => '2027-01-09 09:00'], 'extra_trial_times'],
+            [3, [...$this->steps()[3], 'extra_trial_times' => '2027-04-04 02:30'], 'extra_trial_times'],
+            [3, [...$this->steps()[3], 'extra_trial_times' => '2027-01-32 09:00'], 'extra_trial_times'],
             [3, [...$this->steps()[3], 'deadline' => '2099-12-31'], 'deadline'],
             [3, [...$this->steps()[3], 'trial_date' => '2027-10-03', 'trial_time' => '02:30', 'deadline' => '2027-10-01'], 'trial_time'],
             [3, [...$this->steps()[3], 'trial_date' => '2027-04-04', 'trial_time' => '02:30', 'deadline' => '2027-04-01'], 'trial_time'],
