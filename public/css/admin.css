@@ -1,0 +1,56 @@
+.admin-nav {
+    gap: .35rem;
+    padding: .4rem;
+    border: 1px solid #dce5f3;
+    border-radius: 16px;
+    background: #edf3ff;
+}
+.admin-nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: .5rem .75rem;
+    border-radius: 10px;
+    color: #234772;
+}
+.admin-nav a[aria-current="page"] { background: #172749; color: #fff; }
+.admin-filters {
+    padding: 1rem;
+    border: 1px solid #dce5f3;
+    border-radius: 16px;
+    background: #fff;
+}
+.admin-filters button { background: #b51560; }
+.admin-filters a { padding: .65rem .35rem; }
+.admin-records { list-style: none; display: grid; gap: .75rem; margin: 1.25rem 0; padding: 0; }
+.admin-record {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: .75rem 1.25rem;
+    overflow-wrap: anywhere;
+}
+.admin-record h2 { font-size: 1.2rem; margin: 0; }
+.admin-record p { margin: .3rem 0 0; }
+.admin-you { font-size: .85rem; font-weight: 500; color: #52627b; }
+.admin-record-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+.admin-active { background: #e3f4ec; color: #125638; }
+.admin-account-action, .admin-audit-fields { grid-column: 1 / -1; border-top: 1px solid #dce5f3; padding-top: .75rem; }
+.admin-account-action summary { cursor: pointer; color: #164c91; font-weight: 700; padding: .45rem 0; }
+.admin-account-action summary:focus-visible { outline: 3px solid #246dcc; outline-offset: 3px; }
+.admin-account-action form { max-width: 34rem; }
+.admin-account-action button { margin-top: .75rem; }
+.admin-danger { background: #9c1739; }
+.admin-audit-fields { display: flex; flex-wrap: wrap; gap: .75rem 1.5rem; margin: 0; }
+.admin-audit-fields > div { min-width: 0; }
+.admin-audit-fields dt { color: #52627b; font-size: .875rem; }
+.admin-audit-fields dd { margin: .2rem 0 0; }
+.admin-empty { padding: 1.25rem; border: 1px dashed #b9c8df; border-radius: 16px; background: #fff; }
+
+@media (max-width: 600px) {
+    .admin-record { grid-template-columns: minmax(0, 1fr); }
+    .admin-filters label { flex-basis: 100%; min-width: 0; }
+    .admin-audit-fields { flex-direction: column; }
+    .admin-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .admin-stats article { overflow-wrap: anywhere; }
+}
