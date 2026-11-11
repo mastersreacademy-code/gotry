@@ -37,6 +37,7 @@ Route::middleware('auth')->group(function (): void {
         Route::middleware('throttle:interest-writes')->group(function (): void {
             Route::post('/activities/{activity}/interest', [ParentInterestController::class, 'store'])->whereNumber('activity')->block(10, 10)->name('parent.interest');
             Route::post('/parent/interests/{interest}/withdraw', [ParentInterestController::class, 'withdraw'])->whereNumber('interest')->block(10, 10)->name('parent.withdraw');
+            Route::post('/parent/interests/{interest}/transfer', [ParentInterestController::class, 'transfer'])->whereNumber('interest')->block(10, 10)->name('parent.transfer');
             Route::post('/parent/interests/{interest}/restore', [ParentInterestController::class, 'restore'])->whereNumber('interest')->block(10, 10)->name('parent.restore');
         });
     });
@@ -45,6 +46,7 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/provider/new/{step?}', [ProviderActivityController::class, 'create'])->where('step', '[1-5]')->block(10, 10)->name('provider.create');
         Route::post('/provider/new/{step}', [ProviderActivityController::class, 'save'])->where('step', '[1-4]')->block(10, 10)->name('provider.save');
         Route::post('/provider/submit', [ProviderActivityController::class, 'submit'])->block(10, 10)->name('provider.submit');
+        Route::post('/provider/activities/{activity}/reschedule', [ProviderActivityController::class, 'reschedule'])->whereNumber('activity')->middleware('throttle:interest-writes')->block(10, 10)->name('provider.reschedule');
         Route::get('/provider/activities/{activity}', [ProviderActivityController::class, 'show'])->whereNumber('activity')->name('provider.activity');
     });
     Route::middleware('role:admin')->group(function (): void {

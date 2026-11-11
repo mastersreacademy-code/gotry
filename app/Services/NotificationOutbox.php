@@ -33,14 +33,16 @@ class NotificationOutbox
         [$title, $parentCopy, $providerCopy] = match ($event->action) {
             'registered' => ['Interest registered', 'Your interest was registered.', 'A new interest was registered.'],
             'withdrawn' => ['Interest withdrawn', 'Your interest was withdrawn.', 'An interest registration was withdrawn.'],
+            'transferred' => ['Trial session changed', 'Your interest moved to another session.', 'An interest registration moved to another session.'],
             'restored' => ['Interest restored', 'Your interest was restored.', 'An interest registration was restored.'],
             default => throw new LogicException('Unsupported interest notification event.'),
         };
+        $context = $this->trialContext($activity, $interest->trial_session, $event->schedule_change);
         $base = ['activity_id' => $activity->id, 'interest_event_id' => $event->id, 'activity_event_id' => null, 'title' => $title];
         $this->enqueue('interest:'.$event->id, $interest->parent_id, [...$base, 'kind' => 'parent_'.$event->action,
-            'message' => $parentCopy.$this->trialContext($activity, $interest->trial_session).' This is not a confirmed booking or payment request.']);
+            'message' => $parentCopy.$context.' This is not a confirmed booking or payment request.']);
         $this->enqueue('interest:'.$event->id, $activity->provider_id, [...$base, 'kind' => 'provider_'.$event->action,
-            'message' => $providerCopy.$this->trialContext($activity, $interest->trial_session).' No child or parent details are included in this notice.']);
+            'message' => $providerCopy.$context.' No child or parent details are included in this notice.']);
     }
 
     public function activity(ActivityEvent $event, Activity $activity): void
@@ -54,13 +56,15 @@ class NotificationOutbox
             'confirm_minimum' => ['trial_proceeding','Trial proceeding','Minimum interest has been reached. No payment has been collected and this is not proof of a paid booking.'],
             'cancel_low_numbers' => ['trial_cancelled','Trial cancelled','The trial did not reach its required minimum and has been cancelled.'],
             'cancel_admin' => ['trial_cancelled','Trial cancelled','An administrator has cancelled this trial. No payment was collected by GoTry.'],
+            'rescheduled' => ['trial_rescheduled', 'Trial rescheduled', 'The trial session time changed. Existing interest registrations stay with this session.'],
             'minimum_lost' => ['trial_review','Trial requires review','Interest is below the required minimum. The trial has returned to registration review.'],
             default => throw new LogicException('Unsupported activity notification event.'),
         };
+        $context = $this->trialContext($activity, $session, $event->schedule_change);
         // Feedback/contact details stay on the authorized activity page, not in copied payloads.
         $this->enqueue('activity:'.$event->id, $activity->provider_id, ['activity_id' => $activity->id,
             'interest_event_id' => null, 'activity_event_id' => $event->id, 'kind' => $kind, 'title' => $title,
-            'message' => $copy.$this->trialContext($activity, $session)]);
+            'message' => $copy.$context]);
         if (! in_array($event->action,['approve','reject'],true)) {
             $interests = Interest::where('activity_id', $activity->id)->where('status', 'interested');
             if ($session !== null) {
@@ -72,12 +76,15 @@ class NotificationOutbox
             }
             $parents = $interests->distinct()->pluck('parent_id');
             foreach ($parents as $parentId) $this->enqueue('activity:'.$event->id,(int)$parentId,['activity_id'=>$activity->id,
-                'interest_event_id'=>null,'activity_event_id'=>$event->id,'kind'=>'parent_'.$kind,'title'=>$title,'message'=>$copy.$this->trialContext($activity, $session)]);
+                'interest_event_id'=>null,'activity_event_id'=>$event->id,'kind'=>'parent_'.$kind,'title'=>$title,'message'=>$copy.$context]);
         }
     }
 
-    private function trialContext(Activity $activity, ?int $session): string
+    private function trialContext(Activity $activity, ?int $session, ?array $change): string
     {
+        if ($change !== null) {
+            return ' Activity: '.$activity->title.'. Previous start: '.$change['from_start'].' (Sydney). New start: '.$change['to_start'].' (Sydney).';
+        }
         $start = TrialSchedule::sessions($activity)[$session] ?? null;
 
         return ' Activity: '.$activity->title.'.'.($start === null ? '' : ' Trial session: '.$start.' (Sydney).');

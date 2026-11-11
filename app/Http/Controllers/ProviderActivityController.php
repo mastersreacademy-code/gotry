@@ -6,6 +6,7 @@ use App\Models\Activity;
 use App\Models\ActivityEvent;
 use App\Services\ActivityDraft;
 use App\Services\ParentInterests;
+use App\Services\ProviderTrialRescheduling;
 use App\Services\ProgrammePricing;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -85,6 +86,14 @@ class ProviderActivityController
     {
         abort_unless($activity->provider_id === $request->user()->id, 404);
         return view('provider.show', ['activity' => $activity, 'sessions' => $interests->sessionSummary($activity), 'review' => $this->review($schema, $activity->details), 'prices' => $pricing->preview($activity->details)]);
+    }
+
+    public function reschedule(Request $request, Activity $activity, ProviderTrialRescheduling $service)
+    {
+        abort_unless($activity->provider_id === $request->user()->id, 404);
+        $request->validate(['reschedule_confirm' => ['accepted']]);
+        $service->reschedule($request->user(), $activity->id, $request->all());
+        return redirect()->route('provider.activity', $activity)->with('status', 'Trial rescheduled. Affected parents will see an in-app notice.');
     }
 
     public function review(ActivityDraft $schema, array $data): array

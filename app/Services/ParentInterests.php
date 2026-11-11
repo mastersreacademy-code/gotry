@@ -108,10 +108,10 @@ class ParentInterests
         abort_unless($availability['open'], 409, $availability['reason'] ?? 'Trial unavailable.');
     }
 
-    private function record(Interest $interest, User $actor, string $action, ?string $from, Activity $activity): void
+    private function record(Interest $interest, User $actor, string $action, ?string $from, Activity $activity, ?array $scheduleChange = null): void
     {
         $event = InterestEvent::create(['interest_id' => $interest->id, 'actor_id' => $actor->id, 'action' => $action,
-            'from_status' => $from, 'to_status' => $interest->status, 'version' => $interest->version]);
+            'from_status' => $from, 'to_status' => $interest->status, 'version' => $interest->version, 'schedule_change' => $scheduleChange]);
         app(NotificationOutbox::class)->interest($event, $interest, $activity);
     }
 
@@ -141,6 +141,40 @@ class ParentInterests
         }, 5);
     }
 
+    public function transfer(User $parent, int $interestId, array $input): Interest
+    {
+        $this->assertParent($parent);
+        $snapshot = Interest::whereKey($interestId)->where('parent_id', $parent->id)->firstOrFail();
+        $data = Validator::make($input, [
+            'expected_version' => ['required', 'integer', 'min:1'],
+            'expected_activity_version' => ['required', 'integer', 'min:1'],
+            'trial_session' => ['required', 'integer', 'between:1,10'],
+        ])->validate();
+
+        return DB::transaction(function () use ($parent, $snapshot, $data) {
+            $activity = $this->lockActivity($snapshot->activity_id);
+            $interest = Interest::whereKey($snapshot->id)->where('parent_id', $parent->id)->lockForUpdate()->firstOrFail();
+            abort_unless($interest->status === 'interested' && $interest->version === (int) $data['expected_version'],
+                409, 'Registration changed. Refresh your dashboard and try again.');
+            $source = $interest->trial_session;
+            $destination = (int) $data['trial_session'];
+            $sessions = TrialSchedule::sessions($activity);
+            abort_unless(isset($sessions[$source], $sessions[$destination]) && $source !== $destination,
+                422, 'Choose a different session from this activity.');
+            abort_unless(TrialSchedule::startsAt($sessions[$source])->isFuture(), 409, 'The original session has already started.');
+            $this->assertAccepting($activity, (int) $data['expected_activity_version'], $interest->child_age, $destination);
+
+            $interest->update(['trial_session' => $destination, 'version' => $interest->version + 1,
+                'activity_version' => $activity->version]);
+            $this->record($interest, $parent, 'transferred', 'interested', $activity, [
+                'from_session' => $source, 'to_session' => $destination,
+                'from_start' => $sessions[$source], 'to_start' => $sessions[$destination],
+            ]);
+            app(AdminActivityLifecycle::class)->reopenSessionBelowMinimum($activity, $source, $parent);
+            return $interest;
+        }, 5);
+    }
+
     public function change(User $parent, int $interestId, string $action, array $input): Interest
     {
         $this->assertParent($parent);
@@ -153,8 +187,11 @@ class ParentInterests
             $interest = Interest::whereKey($snapshot->id)->where('parent_id', $parent->id)->lockForUpdate()->firstOrFail();
             $target = $action === 'withdraw' ? 'withdrawn' : 'interested';
             $expected = (int) $data['expected_version'];
-            // An immediate retry is harmless; old forms from before a restore are rejected.
-            if ($interest->status === $target && $interest->version === $expected + 1) return $interest;
+            $eventAction = $action === 'withdraw' ? 'withdrawn' : 'restored';
+            // A transfer also increments the version, so verify the action on a retry.
+            if ($interest->status === $target && $interest->version === $expected + 1
+                && InterestEvent::where('interest_id', $interest->id)->where('version', $interest->version)
+                    ->where('action', $eventAction)->exists()) return $interest;
             $source = $action === 'withdraw' ? 'interested' : 'withdrawn';
             abort_unless($interest->version === $expected && $interest->status === $source, 409, 'Registration changed. Refresh your dashboard and try again.');
             if ($action === 'restore') $this->assertAccepting($activity, (int) $data['expected_activity_version'], $interest->child_age, $interest->trial_session);
@@ -162,7 +199,7 @@ class ParentInterests
             $interest->update(['status' => $target, 'version' => $interest->version + 1,
                 'activity_version' => $action === 'restore' ? $activity->version : $interest->activity_version,
                 'withdrawn_at' => $action === 'withdraw' ? now() : null]);
-            $this->record($interest, $parent, $action === 'withdraw' ? 'withdrawn' : 'restored', $from, $activity);
+            $this->record($interest, $parent, $eventAction, $from, $activity);
             if ($action === 'withdraw' && $interest->trial_session !== null) {
                 app(AdminActivityLifecycle::class)->reopenSessionBelowMinimum($activity, $interest->trial_session, $parent);
             }

@@ -13,6 +13,8 @@
         $sessionStatus = $activity->status === 'pending_registrations'
             ? \App\Services\TrialSchedule::status($activity, $interest->trial_session)
             : $activity->status;
+        $destinations = $openSessions[$activity->id] ?? [];
+        unset($destinations[$interest->trial_session]);
         $slot = $availability[$activity->id][$interest->trial_session ?? 0];
     @endphp
     <article>
@@ -29,6 +31,21 @@
                 <label class="check-row"><input type="checkbox" name="withdraw_confirm" value="1" required> I want to withdraw this registration.</label>
                 <button class="secondary" type="submit">Withdraw interest</button>
             </form>
+            @if($sessionStart && $destinations !== [] && \App\Services\TrialSchedule::startsAt($sessionStart)->isFuture())
+            <form method="post" action="{{ route('parent.transfer', $interest) }}">@csrf
+                <input type="hidden" name="expected_version" value="{{ $interest->version }}">
+                <input type="hidden" name="expected_activity_version" value="{{ $activity->version }}">
+                <label for="transfer-{{ $interest->id }}">Move to another trial session (Sydney time)</label>
+                <select id="transfer-{{ $interest->id }}" name="trial_session" required>
+                    <option value="">Choose a session</option>
+                    @foreach($destinations as $number => $start)
+                    <option value="{{ $number }}">{{ $start }}</option>
+                    @endforeach
+                </select>
+                <label class="check-row"><input type="checkbox" name="transfer_confirm" value="1" required> Move this interest and release the original seat.</label>
+                <button type="submit">Move interest</button>
+            </form>
+            @endif
         @elseif($slot['open'])
             <form method="post" action="{{ route('parent.restore', $interest) }}">@csrf
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">
