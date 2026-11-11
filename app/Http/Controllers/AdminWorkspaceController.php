@@ -44,7 +44,7 @@ class AdminWorkspaceController
             default=>DB::table('activity_events as e')->join('activities as a','a.id','=','e.activity_id')
                 ->select('e.id','e.action','e.from_status','e.to_status','e.created_at','e.actor_id','e.reason','a.title as subject','e.trial_session','e.schedule_change'),
         };
-        $events=$query->join('users as actor','actor.id','=','e.actor_id')->addSelect('actor.email as actor')->orderByDesc('e.id')->paginate(30)->withQueryString();
+        $events=$query->leftJoin('users as actor','actor.id','=','e.actor_id')->addSelect('actor.email as actor')->orderByDesc('e.id')->paginate(30)->withQueryString();
         return view('admin.audit',compact('events','type'));
     }
 }

@@ -34,3 +34,7 @@ The HTTP/browser scripts create synthetic provider accounts and listings; use an
 See [parent registration and capacity](docs/parent-registration.md) for InnoDB requirements, audit semantics and the guarded concurrency test. Run `php artisan gotry:check-database` after deployment migrations to verify transactional engines.
 
 See [super-admin operations](docs/super-admin.md) and [notification delivery](docs/notification-outbox.md). In production, the existing `admin` role is displayed as Super admin; no accounts, roles or passwords are seeded or reset by these migrations.
+
+### Trial waitlists
+
+GoTry's Laravel scheduler runs `gotry:process-waitlists` every minute when the hosting scheduler invokes `php artisan schedule:run`. The command can also be run directly from the GoTry checkout. It releases expired offers and fills available seats in queue order. Each activity is processed in a transaction, so a failed audit or notice write can be retried on the next run.

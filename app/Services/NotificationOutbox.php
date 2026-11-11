@@ -27,7 +27,8 @@ class NotificationOutbox
     public function interest(InterestEvent $event, Interest $interest, Activity $activity): void
     {
         $actor = $event->action === 'offered' ? $activity->provider_id : $interest->parent_id;
-        $validActor = (int) $event->actor_id === $actor
+        $validActor = ($event->actor_id === null && in_array($event->action, ['offered', 'offer_expired'], true))
+            || (int) $event->actor_id === $actor
             || ($event->action === 'offer_expired' && (int) $event->actor_id === $activity->provider_id);
         if ((int) $event->interest_id !== $interest->id || (int) $event->version !== $interest->version
             || ! $validActor || $interest->activity_id !== $activity->id) {
