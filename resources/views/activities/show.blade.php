@@ -5,7 +5,6 @@
 @endpush
 @section('content')
 <div class="discovery-ui activity-page">
-    <a class="activity-back" href="{{ route('activities.index') }}">← Explore activities</a>
     @php
         $openSessions = array_filter($sessions, fn ($session) => $session['open'] || $session['can_waitlist']);
         $canRegister = $sessions === [] ? $availability['open'] : collect($openSessions)->contains('open', true);
@@ -13,8 +12,8 @@
     @endphp
     @php($soccer = $category === 'Sports & Fitness' && \Illuminate\Support\Str::contains(\Illuminate\Support\Str::lower($title), 'soccer'))
     <div class="activity-masthead">
-        <strong class="activity-wordmark">Go<span>Try</span></strong>
-        <div><strong>{{ $details['business_name'] ?? $title }}</strong><small>{{ $category }}</small></div>
+        <a class="activity-wordmark" href="{{ route('home') }}"><img src="{{ asset('images/gotry-activity-logo.webp') }}" alt="GoTry home" width="146" height="97"></a>
+        <div class="activity-organiser"><strong>{{ $details['business_name'] ?? $title }}</strong><small>{{ $category }}</small></div>
         <span class="discovery-badge {{ $canRegister ? 'discovery-badge-open' : ($canWaitlist ? 'discovery-badge-wait' : '') }}">{{ $canRegister ? 'Interest open' : ($canWaitlist ? 'Waitlist open' : 'Trial closed') }}</span>
     </div>
     <section @class(['activity-hero', 'activity-hero-photo' => $soccer])>
@@ -70,14 +69,12 @@
         @else<p>Individual trial: register an enquiry and the provider will arrange availability. There is no shared group-seat limit.</p>@endif
     </section>
     <section class="panel discovery-programme">
-        <h2>Usual lessons</h2>
+        <h2>Programme price @if(count($prices) && $details['regular_format'] === 'group')<small>({{ $details['lessons_per_term'] }} lessons)</small>@endif</h2>
         @if(!empty($details['bring']))<p><strong>What to bring</strong><br>{{ $details['bring'] }}</p>@endif
         @if($details['regular_format'] === 'individual')<p class="preserve-lines">{{ $details['usual_availability'] }}</p>
         @elseif(!empty($details['class_times']))<p class="preserve-lines">{{ $details['class_times'] }}</p>
         @else<p>{{ $details['regular_day'] }} · {{ $details['regular_time'] }}</p>@endif
         @if(count($prices))
-            <h2>Programme price</h2>
-            @if($details['regular_format'] === 'group')<p>{{ $details['lessons_per_term'] }} lessons per term</p>@endif
             <div class="activity-prices">
                 @foreach($prices as $price)
                     <div class="activity-price">
@@ -158,6 +155,7 @@
         @elseif(auth()->guest())<a class="button" href="{{ route('login', ['activity' => $activityId]) }}">Sign in as a parent to continue</a>
         @else<p>Parent accounts can register a child's interest. Your account is {{ auth()->user()->role }}.</p>@endif
     </section>
+    <a class="activity-back" href="{{ route('activities.index') }}">← Explore activities</a>
 </div>
 <script type="module" src="{{ asset('js/trial-selection.mjs') }}"></script>
 @endsection
