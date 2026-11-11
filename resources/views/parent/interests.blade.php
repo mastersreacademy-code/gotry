@@ -27,11 +27,12 @@
         $destinations = $openSessions[$activity->id] ?? [];
         unset($destinations[$interest->trial_session]);
         $slot = $availability[$activity->id][$interest->trial_session ?? 0];
+        $cancelled = $interest->status !== 'withdrawn' && in_array($sessionStatus, ['cancelled_by_admin', 'cancelled_low_numbers'], true);
         $liveOffer = $interest->status === 'offered' && $interest->offer_expires_at->isFuture();
         $canAccept = $liveOffer && $slot['accepting_offers'];
     @endphp
     <article @class(['parent-card', 'parent-card-offer' => $canAccept])>
-        <span class="status {{ $interest->status === 'offered' && ! $canAccept ? 'parent-status-inactive' : 'parent-status-'.$interest->status }}">{{ match($interest->status) {
+        <span class="status {{ ($cancelled || ($interest->status === 'offered' && ! $canAccept)) ? 'parent-status-inactive' : 'parent-status-'.$interest->status }}">{{ $cancelled ? 'Trial cancelled' : match($interest->status) {
             'interested' => 'Interest registered', 'waitlisted' => 'On waitlist',
             'offered' => $canAccept ? 'Seat offered' : ($liveOffer ? 'Offer unavailable' : 'Offer expired'),
             'withdrawn' => match ($interest->latestEvent?->action) {

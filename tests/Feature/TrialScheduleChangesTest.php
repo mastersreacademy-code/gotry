@@ -141,6 +141,35 @@ class TrialScheduleChangesTest extends TestCase
         $this->actingAs($this->user('admin'))->get('/admin/audit')->assertOk()->assertSee('2026-12-10 09:00')->assertSee('2026-12-13 15:30');
     }
 
+    public function test_reschedule_then_cancel_updates_dashboards_and_scopes_notices(): void
+    {
+        $affected = $this->user();
+        $unaffected = $this->user();
+        $this->register($affected, 1);
+        $this->register($unaffected, 2);
+        $providerPath = '/provider/activities/'.$this->activity->id;
+        $adminPath = '/admin/activities/'.$this->activity->id;
+        $this->actingAs($this->provider)->post($providerPath.'/reschedule', [
+            'trial_session' => 1, 'trial_date' => '2026-12-13', 'trial_time' => '15:30',
+            'expected_activity_version' => 2, 'reschedule_confirm' => 1,
+        ])->assertRedirect();
+        $this->actingAs($affected)->get('/parent')->assertOk()->assertSee('2026-12-13 15:30');
+        $this->get('/notifications')->assertOk()->assertSee('Trial rescheduled');
+        $this->actingAs($this->user('admin'))->post($adminPath.'/lifecycle', [
+            'action' => 'cancel_admin', 'reason' => 'Private cancellation reason',
+            'expected_version' => 3, 'trial_session' => 1,
+        ])->assertRedirect();
+        $this->get($adminPath)->assertOk()->assertSee('Cancelled by Admin');
+        $this->get('/admin/audit')->assertOk()->assertSee('Private cancellation reason');
+        $this->actingAs($this->provider)->get($providerPath)->assertOk()->assertSee('Cancelled by Admin');
+        $this->get('/notifications')->assertOk()->assertSee('Trial cancelled')->assertSee('Trial rescheduled');
+        $this->actingAs($affected)->get('/parent')->assertOk()->assertSee('Trial cancelled')
+            ->assertDontSee('Interest registered')->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $this->get('/notifications')->assertOk()->assertSee('Trial cancelled')->assertDontSee('Private cancellation reason');
+        $this->actingAs($unaffected)->get('/parent')->assertOk()->assertSee('Interest registered')->assertDontSee('Trial cancelled');
+        $this->get('/notifications')->assertOk()->assertDontSee('Trial cancelled')->assertDontSee('Trial rescheduled');
+    }
+
     public function test_reschedule_rolls_back_time_version_and_audit_if_notice_fails(): void
     {
         $this->register($this->user(), 2);
