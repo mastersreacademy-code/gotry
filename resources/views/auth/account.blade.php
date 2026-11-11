@@ -1,6 +1,7 @@
 @extends('layouts.app')
 @section('title', $mode === 'register' ? 'Create account · GoTry' : 'Sign in · GoTry')
 @section('content')
+@php($activityContext = filter_var(old('activity', request()->query('activity')), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]))
 <section class="panel account">
     <h1>{{ $mode === 'register' ? 'Create your account' : 'Welcome back' }}</h1>
     <p>{{ $mode === 'register' ? 'Join as a parent or activity provider.' : 'Sign in to your GoTry account.' }}</p>
@@ -9,6 +10,9 @@
     @endif
     <form method="post" action="{{ $mode === 'register' ? route('register') : url('/login') }}">
         @csrf
+        @if($activityContext)
+            <input type="hidden" name="activity" value="{{ $activityContext }}">
+        @endif
         @if ($mode === 'register')
             <label for="name">Full name</label>
             <input id="name" name="name" value="{{ old('name') }}" maxlength="100" autocomplete="name" required>
@@ -29,6 +33,6 @@
         @endif
         <button type="submit">{{ $mode === 'register' ? 'Create account' : 'Sign in' }}</button>
     </form>
-    <p>@if ($mode === 'register')Already registered? <a href="{{ route('login') }}">Sign in</a>@else New to GoTry? <a href="{{ route('register') }}">Create an account</a>@endif</p>
+    <p>@if ($mode === 'register')Already registered? <a href="{{ route('login', $activityContext ? ['activity' => $activityContext] : []) }}">Sign in</a>@else New to GoTry? <a href="{{ route('register', $activityContext ? ['activity' => $activityContext] : []) }}">Create an account</a>@endif</p>
 </section>
 @endsection

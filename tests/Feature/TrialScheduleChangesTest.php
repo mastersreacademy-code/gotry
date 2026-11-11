@@ -155,6 +155,47 @@ class TrialScheduleChangesTest extends TestCase
         $this->assertDatabaseCount('notification_outbox', 2);
     }
 
+    public function test_guest_can_sign_in_and_return_to_register_or_join_waitlist(): void
+    {
+        $this->register($this->user(), 1);
+        $parent = $this->user();
+        $path = '/activities/'.$this->activity->id;
+        $this->get('/activities?q=Junior')->assertOk()->assertSee($path)->assertSee('Waitlist also open');
+        $this->get($path)->assertOk()->assertSee('/account?activity='.$this->activity->id);
+        $this->get('/account?activity='.$this->activity->id)->assertOk()
+            ->assertSee('name="activity" value="'.$this->activity->id.'"', false)
+            ->assertSee('/register?activity='.$this->activity->id);
+        $this->from('/account?activity='.$this->activity->id)->post('/login', [
+            'email' => $parent->email, 'password' => 'incorrect', 'activity' => $this->activity->id,
+        ])->assertSessionHasErrors('email');
+        $this->post('/login', [
+            'email' => $parent->email, 'password' => 'local test password!', 'activity' => $this->activity->id,
+        ])->assertRedirect($path.'#trial');
+        $this->get($path)->assertOk()->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $input = ['child_age' => 8, 'expected_activity_version' => 2, 'interest_terms' => 1];
+        $this->post($path.'/interest', [...$input, 'child_name' => 'Open session child', 'trial_session' => 2])->assertRedirect('/parent');
+        $this->post($path.'/interest', [...$input, 'child_name' => 'Waitlist child', 'trial_session' => 1, 'waitlist' => 1])->assertRedirect('/parent');
+        $this->get('/parent')->assertOk()->assertSee('Open session child')->assertSee('Interest registered')
+            ->assertSee('Waitlist child')->assertSee('On waitlist');
+    }
+
+    public function test_signup_can_return_to_activity_but_invalid_context_uses_dashboard(): void
+    {
+        $path = '/activities/'.$this->activity->id;
+        $signup = ['name' => 'New parent', 'email' => 'new-parent@example.test', 'role' => 'parent',
+            'password' => 'local test password!', 'password_confirmation' => 'local test password!'];
+        $this->post('/register', [...$signup, 'activity' => $this->activity->id])->assertRedirect($path.'#trial');
+        auth()->logout();
+        $this->post('/login', [
+            'email' => $signup['email'], 'password' => $signup['password'], 'activity' => 'https://example.test',
+        ])->assertRedirect('/dashboard');
+        auth()->logout();
+        $this->activity->update(['status' => 'pending_approval']);
+        $this->post('/login', [
+            'email' => $signup['email'], 'password' => $signup['password'], 'activity' => $this->activity->id,
+        ])->assertRedirect('/dashboard');
+    }
+
     public function test_fifo_offer_reserves_capacity_and_only_owner_can_accept(): void
     {
         $holder = $this->user();

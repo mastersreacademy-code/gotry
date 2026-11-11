@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Activity;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,7 +35,7 @@ class AuthController
         }
         Auth::login($user);
         $request->session()->regenerate();
-        return redirect()->route('dashboard');
+        return $this->afterAuthentication($request, Auth::user());
     }
 
     public function login(Request $request): RedirectResponse
@@ -48,6 +49,18 @@ class AuthController
             throw ValidationException::withMessages(['email' => 'The email or password is incorrect.']);
         }
         $request->session()->regenerate();
+        return $this->afterAuthentication($request, Auth::user());
+    }
+
+    private function afterAuthentication(Request $request, User $user): RedirectResponse
+    {
+        $activityId = filter_var($request->input('activity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        if ($user->role === 'parent' && $activityId !== false
+            && Activity::whereKey($activityId)->where('status', 'pending_registrations')
+                ->whereHas('provider', fn ($query) => $query->where('is_active', true))->exists()) {
+            return redirect()->to(route('activities.show', ['activity' => $activityId]).'#trial');
+        }
+
         return redirect()->route('dashboard');
     }
 
