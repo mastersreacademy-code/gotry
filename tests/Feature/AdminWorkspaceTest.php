@@ -19,6 +19,25 @@ class AdminWorkspaceTest extends TestCase
                 'description'=>'Music discovery','venue'=>'Sydney','min_age'=>6,'max_age'=>10,'regular_format'=>'individual','individual_price'=>60,'usual_availability'=>'After school','discount_type'=>'none'],...$details]]);
     }
     private function interest(User $parent,Activity $activity,string $name): Interest { return (new ParentInterests)->register($parent,$activity->id,['child_name'=>$name,'child_age'=>8,'expected_activity_version'=>2]); }
+    public function test_stale_admin_forms_return_to_current_listing_without_changes(): void
+    {
+        $activity = $this->activity('pending_approval');
+        $path = '/admin/activities/'.$activity->id;
+        $this->actingAs($this->user())->post($path.'/decision', [
+            'action' => 'approve', 'expected_version' => 1,
+        ])->assertRedirect();
+        $input = ['expected_version' => 1, 'return_to_listing' => 1, 'reason' => 'Stale decision'];
+        $this->post($path.'/decision', [...$input, 'action' => 'reject'])
+            ->assertRedirect($path)->assertSessionHasErrors('listing');
+        $this->get($path)->assertOk()->assertSee('This activity has already changed')
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $this->post($path.'/lifecycle', [...$input, 'action' => 'cancel_admin'])
+            ->assertRedirect($path)->assertSessionHasErrors('listing');
+        $this->assertSame('pending_registrations', $activity->fresh()->status);
+        $this->assertDatabaseCount('activity_events', 1);
+        $this->assertDatabaseCount('notification_outbox', 1);
+    }
+
     public function test_admin_pages_filters_and_audit_are_protected_and_usable(): void
     {
         $activity=$this->activity('pending_approval'); $this->actingAs($this->user());
