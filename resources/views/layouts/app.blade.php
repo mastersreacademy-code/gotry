@@ -6,6 +6,7 @@
     <meta name="robots" content="noindex,nofollow">
     <title>@yield('title', 'GoTry — Try before you enrol')</title>
     <link rel="stylesheet" href="{{ asset('css/app.css') }}">
+    @stack('styles')
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to content</a>

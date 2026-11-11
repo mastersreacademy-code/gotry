@@ -1,10 +1,23 @@
 @extends('layouts.app')
 @section('title', $steps[$step].' · Provider registration · GoTry')
+@push('styles')
+<link rel="stylesheet" href="{{ asset('css/provider.css') }}">
+@endpush
 @section('content')
-<section class="panel wizard">
-    <div class="heading-row"><strong>Provider Registration</strong><span>Step {{ $step }} of 5 · {{ $step * 20 }}%</span></div>
-    <progress value="{{ $step }}" max="5" aria-label="Registration progress">{{ $step * 20 }}%</progress>
-    <ol class="wizard-steps">@foreach($steps as $number => $label)<li @if($number === $step) aria-current="step" @endif>{{ $number }}. {{ $label }}</li>@endforeach</ol>
+<section class="panel wizard provider-ui">
+    <div class="heading-row wizard-heading">
+        <a href="{{ route('provider.dashboard') }}">← Your listings</a>
+        <span>Step {{ $step }} of {{ count($steps) }} · {{ $steps[$step] }}</span>
+    </div>
+    <progress class="visually-hidden" value="{{ $step }}" max="{{ count($steps) }}" aria-label="Listing progress"></progress>
+    <ol class="wizard-steps">
+        @foreach($steps as $number => $label)
+            <li @if($number === $step) aria-current="step" @endif @class(['complete' => $number < $step])>
+                <span class="step-dot" aria-hidden="true">{{ $number < $step ? '✓' : $number }}</span>
+                <span class="step-label">{{ $label }}</span>
+            </li>
+        @endforeach
+    </ol>
     <h1>{{ [1 => 'Tell us about your organisation', 2 => 'What activity are you offering?', 3 => 'Set up your introductory trial', 4 => 'Regular lesson details', 5 => 'Review your listing'][$step] }}</h1>
     <p>{{ [1 => 'These details help us verify your business and contact you about bookings.', 2 => 'Describe what children will learn, do and experience.', 3 => 'These details apply only to the introductory trial, separate from your regular paid programme.', 4 => 'Provide details of ongoing lessons families may choose after their introductory trial.', 5 => 'Check trial and regular programme details separately before submitting.'][$step] }}</p>
     @if($errors->any())<div class="error" role="alert"><ul>@foreach($errors->all() as $message)<li>{{ $message }}</li>@endforeach</ul></div>@endif
