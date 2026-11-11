@@ -35,7 +35,7 @@
     <div class="discovery-detail">
     <section class="panel discovery-trial" id="trial">
         <p class="eyebrow">Free introductory trial</p>
-        <h2>Register interest for the trial</h2>
+        <h2>{{ $canRegister ? 'Register interest for the trial' : ($canWaitlist ? 'Join the trial waitlist' : 'Trial availability') }}</h2>
         <div class="activity-deadline">
             <strong>Register interest by</strong>
             <time datetime="{{ $details['deadline'] }}">{{ \Illuminate\Support\Carbon::parse($details['deadline'])->format('D, j M Y') }}</time>
@@ -124,12 +124,19 @@
                 @endforeach
             </div>
         @endif
-        <h2>How it works</h2>
-        <ol class="activity-steps">
-            <li>Register interest for free.</li>
-            <li>Check your dashboard for trial updates or a seat offer.</li>
-            <li>Attend the trial once the session is confirmed.</li>
-        </ol>
+        @if($canRegister || $canWaitlist)
+            <h2>How it works</h2>
+            <ol class="activity-steps">
+                @if($details['trial_type'] === 'individual')
+                    <li>Register your interest for free.</li>
+                    <li>Arrange a trial time with the provider.</li>
+                @else
+                    <li>{{ $canRegister ? 'Register interest for free.' : 'Join the waitlist for free.' }}</li>
+                    <li>Check your dashboard for trial updates or a seat offer.</li>
+                    <li>Attend the trial once the session is confirmed.</li>
+                @endif
+            </ol>
+        @endif
     </section>
     </div>
     @if(($canRegister || $canWaitlist) && (auth()->guest() || auth()->user()->role === 'parent'))

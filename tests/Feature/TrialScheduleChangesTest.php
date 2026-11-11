@@ -53,6 +53,32 @@ class TrialScheduleChangesTest extends TestCase
         ]);
     }
 
+    public function test_activity_detail_matches_trial_format_and_availability(): void
+    {
+        $path = '/activities/'.$this->activity->id;
+        $details = $this->activity->details;
+        $this->actingAs($this->user())->get($path)->assertOk()->assertSee('Choose a session')
+            ->assertSee('data-intent="register"', false)->assertDontSee('data-intent="waitlist"', false);
+
+        $holder = $this->user();
+        foreach ([1, 2, 3] as $number) $this->register($holder, $number, 'Child '.$number);
+        $this->get($path)->assertOk()->assertSee('Join the trial waitlist')->assertSee('Join the waitlist for free.')
+            ->assertSee('data-intent="waitlist"', false)->assertDontSee('data-intent="register"', false);
+
+        $this->activity->update(['details' => [...$details, 'deadline' => '2026-11-10']]);
+        $this->get($path)->assertOk()->assertSee('No trial sessions are accepting interest.')
+            ->assertDontSee('data-trial-form', false)->assertDontSee('How it works');
+
+        $this->activity->update(['details' => [...$details, 'extra_trial_times' => null, 'trial_max' => 4]]);
+        $this->get($path)->assertOk()->assertSee('Trial date')->assertSee('1–4 children')
+            ->assertSee('data-intent="register"', false)->assertDontSee('Choose a session');
+
+        $this->activity->update(['details' => [...$details, 'trial_type' => 'individual', 'trial_availability' => 'After school']]);
+        $this->get($path)->assertOk()->assertSee('After school')->assertSee('Arrange a trial time with the provider.')
+            ->assertDontSee('Attend the trial once the session is confirmed.')
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
     public function test_transfer_checks_ownership_capacity_and_versions_and_keeps_a_single_interest(): void
     {
         $parent = $this->user();
