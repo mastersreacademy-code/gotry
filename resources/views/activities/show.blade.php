@@ -73,6 +73,7 @@
             <p class="notice">{{ $sessions !== [] ? 'No trial sessions are accepting interest.' : $availability['reason'] }}</p>
         @elseif(auth()->user()?->role === 'parent')
             <form method="post" data-trial-form action="{{ route('parent.interest', $activityId) }}">@csrf
+                <input type="hidden" name="return_to_trial" value="1">
                 <input type="hidden" name="expected_activity_version" value="{{ $activityVersion }}">
                 @if($sessions !== [])
                     <label for="trial_session">Trial session (Sydney time)</label>

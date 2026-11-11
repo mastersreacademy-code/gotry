@@ -123,7 +123,7 @@ class ParentInterests
     private function assertEligible(Activity $activity, int $expectedVersion, int $age, ?int $session): void
     {
         abort_unless($activity->status === 'pending_registrations', 404, 'Activity not available.');
-        abort_unless($activity->version === $expectedVersion, 409, 'Activity details changed. Refresh and review them before registering.');
+        abort_unless($activity->version === $expectedVersion, 409, 'Activity details changed. Review the latest trial details before submitting again.');
         $reason = $this->closedReason($activity, $session);
         abort_if($reason !== null, 409, $reason ?? 'Registration closed.');
         $data = $activity->details;
@@ -165,7 +165,7 @@ class ParentInterests
             }
             if ($waitlist) {
                 $this->assertEligible($activity, (int) $data['expected_activity_version'], (int) $data['child_age'], $session);
-                abort_unless($this->availability($activity, session: $session)['can_waitlist'], 409, 'This session is not taking waitlist entries.');
+                abort_unless($this->availability($activity, session: $session)['can_waitlist'], 409, 'This session is no longer taking waitlist entries. Review the current options before submitting again.');
             } else {
                 $this->assertAccepting($activity, (int) $data['expected_activity_version'], (int) $data['child_age'], $session);
             }
