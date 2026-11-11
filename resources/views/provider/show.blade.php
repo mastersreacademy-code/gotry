@@ -14,7 +14,7 @@
     </div>
     @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
     @if($activity->review_reason)<p class="notice"><strong>Admin feedback:</strong> {{ $activity->review_reason }}</p>@endif
-    <div class="panel provider-management">
+    <div class="panel provider-management" id="trial-management">
     @if($singleTrialInterest !== null)
         <section class="review-section">
             <h2>Trial interest</h2>

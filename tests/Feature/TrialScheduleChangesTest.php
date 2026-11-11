@@ -162,7 +162,8 @@ class TrialScheduleChangesTest extends TestCase
         $this->get($adminPath)->assertOk()->assertSee('Cancelled by Admin');
         $this->get('/admin/audit')->assertOk()->assertSee('Private cancellation reason');
         $this->actingAs($this->provider)->get($providerPath)->assertOk()->assertSee('Cancelled by Admin');
-        $this->get('/notifications')->assertOk()->assertSee('Trial cancelled')->assertSee('Trial rescheduled');
+        $this->get('/notifications')->assertOk()->assertSee('Trial cancelled')->assertSee('Trial rescheduled')
+            ->assertSee($providerPath.'#trial-management');
         $this->actingAs($affected)->get('/parent')->assertOk()->assertSee('Trial cancelled')
             ->assertDontSee('Interest registered')->assertHeader('X-Robots-Tag', 'noindex, nofollow');
         $this->get('/notifications')->assertOk()->assertSee('Trial cancelled')->assertDontSee('Private cancellation reason');
@@ -359,7 +360,10 @@ class TrialScheduleChangesTest extends TestCase
 
         $this->actingAs($second)->get('/notifications')->assertOk()->assertDontSee('Review seat offer');
         $this->actingAs($first)->get('/notifications')->assertOk()->assertSee('Review seat offer')
-            ->assertSee('href="'.route('parent.dashboard').'"', false);
+            ->assertSee('href="'.route('parent.dashboard', ['activity' => $this->activity->id]).'"', false);
+        $this->get('/parent?activity='.$this->activity->id)->assertOk()->assertSee('Accept seat offer')->assertSee('All registrations');
+        $this->get('/parent?activity=999999')->assertOk()->assertSee('No registrations for this activity')
+            ->assertDontSee('Accept seat offer');
         $this->get('/parent')->assertOk()->assertSee('Accept by')->assertSee('Decline offer');
         $this->post('/parent/interests/'.$entry->id.'/waitlist', [
             'decision' => 'leave', 'expected_version' => 2, 'expected_activity_version' => 3,

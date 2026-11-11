@@ -13,7 +13,10 @@
     </div>
     <a class="button" href="{{ route('activities.index') }}">Explore activities →</a>
 </section>
-<h2 class="parent-list-title">Your registrations</h2>
+<h2 class="parent-list-title">{{ $activityFilter ? 'Registrations for this activity' : 'Your registrations' }}</h2>
+@if($activityFilter)
+    <p><a href="{{ route('parent.dashboard') }}">← All registrations</a></p>
+@endif
 @if(session('status'))<p class="notice" role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<div class="error" role="alert">{{ $errors->first() }}</div>@endif
 <div class="grid">
@@ -96,7 +99,7 @@
     </article>
 @empty
     <article class="parent-empty">
-        <h3>No registrations yet</h3>
+        <h3>{{ $activityFilter ? 'No registrations for this activity' : 'No registrations yet' }}</h3>
         <p>Explore activities to find a trial. Registering interest is free and does not confirm a place.</p>
     </article>
 @endforelse
