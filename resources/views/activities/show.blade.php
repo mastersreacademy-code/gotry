@@ -5,17 +5,33 @@
 @endpush
 @section('content')
 <div class="discovery-ui">
-    <header class="discovery-detail-heading">
-        <a href="{{ route('activities.index') }}">← Explore activities</a>
-        <p class="eyebrow">{{ $category }}</p>
-        <h1>{{ $title }}</h1>
-        <p>Ages {{ $details['min_age'] }}–{{ $details['max_age'] }} · {{ $details['venue'] }}</p>
-    </header>
+    <a class="activity-back" href="{{ route('activities.index') }}">← Explore activities</a>
+    @php($soccer = $category === 'Sports & Fitness' && \Illuminate\Support\Str::contains(\Illuminate\Support\Str::lower($title), 'soccer'))
+    <section @class(['activity-hero', 'activity-hero-photo' => $soccer])>
+        <div class="activity-hero-copy">
+            <p class="activity-category">Try before you enrol</p>
+            <h1>{{ $title }}</h1>
+            <p class="activity-description preserve-lines">{{ $details['description'] }}</p>
+            <a class="button activity-trial-link" href="#trial">View trial availability ↓</a>
+        </div>
+        @if($soccer)
+            <img src="{{ asset('images/soccer-trial.webp') }}" alt="" width="1200" height="800" fetchpriority="high">
+        @endif
+    </section>
+    <section class="panel activity-overview">
+    <h2>Programme overview</h2>
+    <dl class="activity-facts">
+        <div><dt>Ages</dt><dd>{{ $details['min_age'] }}–{{ $details['max_age'] }} years</dd></div>
+        <div><dt>Venue</dt><dd>{{ $details['venue'] }}</dd></div>
+        <div><dt>Trial format</dt><dd>{{ $details['trial_type'] === 'group' ? 'Group session' : 'Individual lesson' }}</dd></div>
+        <div><dt>Duration</dt><dd>{{ $details['trial_duration'] }} minutes</dd></div>
+    </dl>
+    </section>
     <div class="discovery-detail">
     <section class="panel discovery-trial" id="trial">
         <p class="eyebrow">Free introductory trial</p>
         <h2>Register interest for the trial</h2>
-        <p>{{ $details['trial_duration'] }} minutes · Register interest by {{ $details['deadline'] }}</p>
+        <p class="activity-deadline"><strong>Register interest by</strong> {{ $details['deadline'] }}</p>
         @if($sessions === [] && $details['trial_type'] === 'group')
             <p>{{ $details['trial_date'] }} at {{ $details['trial_time'] }} · Sydney</p>
         @elseif($details['trial_type'] === 'individual')
@@ -70,14 +86,31 @@
         @else<p>Parent accounts can register a child's interest. Your account is {{ auth()->user()->role }}.</p>@endif
     </section>
     <section class="panel discovery-programme">
-        <h2>About the activity</h2>
-        <p class="preserve-lines">{{ $details['description'] }}</p>
-        @if(!empty($details['bring']))<p><strong>What to bring</strong><br>{{ $details['bring'] }}</p>@endif
         <h2>Usual lessons</h2>
+        @if(!empty($details['bring']))<p><strong>What to bring</strong><br>{{ $details['bring'] }}</p>@endif
         @if($details['regular_format'] === 'individual')<p class="preserve-lines">{{ $details['usual_availability'] }}</p>
         @elseif(!empty($details['class_times']))<p class="preserve-lines">{{ $details['class_times'] }}</p>
         @else<p>{{ $details['regular_day'] }} · {{ $details['regular_time'] }}</p>@endif
-        @include('provider.partials.prices')
+        @if(count($prices))
+            <h2>Programme price</h2>
+            <div class="activity-prices">
+                @foreach($prices as $price)
+                    <div class="activity-price">
+                        <h3>{{ $price['label'] }}</h3>
+                        <p><strong>${{ number_format($price['total'] / 100, 2) }}</strong> · {{ $price['period'] }}</p>
+                        @if($price['discount'] > 0)
+                            <small>Regular price ${{ number_format($price['regular'] / 100, 2) }} · Save ${{ number_format($price['discount'] / 100, 2) }}</small>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @endif
+        <h2>How it works</h2>
+        <ol class="activity-steps">
+            <li>Register interest for free.</li>
+            <li>Check your dashboard for trial updates or a seat offer.</li>
+            <li>Attend the trial once the session is confirmed.</li>
+        </ol>
     </section>
     </div>
 </div>
