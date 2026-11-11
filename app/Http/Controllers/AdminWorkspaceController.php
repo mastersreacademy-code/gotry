@@ -38,11 +38,11 @@ class AdminWorkspaceController
         $data=$request->validate(['type'=>['nullable',Rule::in(['activity','interest','account'])]]); $type=$data['type']??'activity';
         $query=match($type) {
             'interest'=>DB::table('interest_events as e')->join('interests as i','i.id','=','e.interest_id')->join('activities as a','a.id','=','i.activity_id')
-                ->select('e.id','e.action','e.from_status','e.to_status','e.created_at','e.actor_id','a.title as subject','i.trial_session',DB::raw('NULL as reason')),
+                ->select('e.id','e.action','e.from_status','e.to_status','e.created_at','e.actor_id','a.title as subject','i.trial_session','e.schedule_change',DB::raw('NULL as reason')),
             'account'=>DB::table('account_events as e')->join('users as target','target.id','=','e.user_id')
                 ->select('e.id','e.created_at','e.actor_id','e.reason','target.email as subject',DB::raw("CASE WHEN e.to_active=1 THEN 'activated' ELSE 'suspended' END as action"),DB::raw("CASE WHEN e.from_active=1 THEN 'active' ELSE 'suspended' END as from_status"),DB::raw("CASE WHEN e.to_active=1 THEN 'active' ELSE 'suspended' END as to_status")),
             default=>DB::table('activity_events as e')->join('activities as a','a.id','=','e.activity_id')
-                ->select('e.id','e.action','e.from_status','e.to_status','e.created_at','e.actor_id','e.reason','a.title as subject','e.trial_session'),
+                ->select('e.id','e.action','e.from_status','e.to_status','e.created_at','e.actor_id','e.reason','a.title as subject','e.trial_session','e.schedule_change'),
         };
         $events=$query->join('users as actor','actor.id','=','e.actor_id')->addSelect('actor.email as actor')->orderByDesc('e.id')->paginate(30)->withQueryString();
         return view('admin.audit',compact('events','type'));

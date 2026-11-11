@@ -7,6 +7,8 @@ use App\Models\Interest;
 use App\Models\InterestEvent;
 use App\Models\User;
 use App\Services\ParentInterests;
+use App\Services\ProviderTrialRescheduling;
+use App\Models\ActivityEvent;
 use App\Services\NotificationOutbox;
 use App\Services\AdminAccounts;
 use App\Services\AdminActivityLifecycle;
@@ -60,6 +62,19 @@ function executeJob(array $job): array
             return ['status'=>200,'id'=>$activity->id];
         }
         $service = new ParentInterests;
+        if ($job['action'] === 'transfer') {
+            $interest = $service->transfer($parent, $job['interest_id'], [
+                'expected_version' => 1, 'expected_activity_version' => 2, 'trial_session' => $job['trial_session'],
+            ]);
+            return ['status' => 200, 'id' => $interest->id];
+        }
+        if ($job['action'] === 'reschedule') {
+            (new ProviderTrialRescheduling)->reschedule($parent, $job['activity_id'], [
+                'expected_activity_version' => 2, 'trial_session' => $job['trial_session'],
+                'trial_date' => $job['date'], 'trial_time' => '12:00',
+            ]);
+            return ['status' => 200];
+        }
         $interest = $job['action'] === 'register'
             ? $service->register($parent, $job['activity_id'], ['child_name' => $job['name'], 'child_age' => 8, 'expected_activity_version' => 2, 'trial_session' => $job['trial_session'] ?? null])
             : $service->change($parent, $job['interest_id'], $job['action'], ['expected_version' => $job['version'], 'expected_activity_version' => 2]);
@@ -139,6 +154,38 @@ foreach ([1, 2] as $session) {
 check($events($multi) === 2, 'Session race duplicated interest events.');
 check(OutboxMessage::where('activity_id', $multi->id)->count() === 4, 'Session race wrote inconsistent notifications.');
 echo "PASS: eight simultaneous parents across two sessions, one seat and two notices per session\n";
+
+$transferFixture = function () use ($fixture): Activity {
+    $activity = $fixture(1);
+    $activity->update(['details' => [...$activity->details, 'extra_trial_times' => $activity->details['trial_date'].' 11:00']]);
+    return $activity;
+};
+$activity = $transferFixture();
+$source = executeJob([...$job($parents[0], $activity, 'Moving child'), 'trial_session' => 1]);
+$transfer = ['action' => 'transfer', 'parent_id' => $parents[0]->id, 'interest_id' => $source['id'], 'trial_session' => 2];
+$results = parallel([$transfer, [...$job($parents[1], $activity, 'New child'), 'trial_session' => 2]]);
+$statuses = array_column($results, 'status');
+sort($statuses);
+check($statuses === [200, 409], 'Transfer and registration did not compete for the same seat.');
+check((new ParentInterests)->activeInterests($activity, 2)->count() === 1, 'Transfer race overbooked the destination.');
+check($events($activity) === 2 && OutboxMessage::where('activity_id', $activity->id)->count() === 4, 'Transfer race produced inconsistent audit or notices.');
+echo "PASS: transfer versus new registration, exactly one gets the destination seat\n";
+
+$activity = $transferFixture();
+$source = executeJob([...$job($parents[0], $activity, 'Moving child'), 'trial_session' => 1]);
+$results = parallel([
+    [...$transfer, 'interest_id' => $source['id']],
+    ['action' => 'reschedule', 'parent_id' => $provider->id, 'activity_id' => $activity->id, 'trial_session' => 2, 'date' => $activity->details['trial_date']],
+]);
+check($results[1]['status'] === 200, 'Reschedule failed unexpectedly.');
+$moved = $results[0]['status'] === 200;
+check($results[0]['status'] === ($moved ? 200 : 409), 'Unexpected transfer result during reschedule.');
+check(Interest::findOrFail($source['id'])->trial_session === ($moved ? 2 : 1), 'Transfer seat disagreed with the race result.');
+$reschedule = ActivityEvent::where('activity_id', $activity->id)->where('action', 'rescheduled')->sole();
+$recipients = OutboxMessage::where('activity_event_id', $reschedule->id)->pluck('recipient_id')->all();
+check(in_array($provider->id, $recipients) && count($recipients) === ($moved ? 2 : 1)
+    && in_array($parents[0]->id, $recipients) === $moved, 'Reschedule did not notify the committed recipient set.');
+echo "PASS: reschedule versus transfer, stale forms rejected or moved parent notified\n";
 
 $activity = $fixture(2);
 $results = parallel(array_map(fn ($parent) => $job($parent, $activity, 'Child '.$parent->id), $parents));
