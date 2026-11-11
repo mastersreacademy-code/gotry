@@ -34,6 +34,11 @@
         <span class="status {{ $interest->status === 'offered' && ! $canAccept ? 'parent-status-inactive' : 'parent-status-'.$interest->status }}">{{ match($interest->status) {
             'interested' => 'Interest registered', 'waitlisted' => 'On waitlist',
             'offered' => $canAccept ? 'Seat offered' : ($liveOffer ? 'Offer unavailable' : 'Offer expired'),
+            'withdrawn' => match ($interest->latestEvent?->action) {
+                'offer_expired' => 'Offer expired',
+                'waitlist_left' => $interest->latestEvent->from_status === 'offered' ? 'Offer declined' : 'Left waitlist',
+                default => 'Withdrawn',
+            },
             default => 'Withdrawn',
         } }}</span>
         <h3>@if($activity->status === 'pending_registrations')<a href="{{ route('activities.show', $activity) }}">{{ $activity->title }}</a>@else{{ $activity->title }}@endif</h3>

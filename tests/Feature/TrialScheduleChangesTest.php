@@ -315,6 +315,36 @@ class TrialScheduleChangesTest extends TestCase
         $this->actingAs($this->user('admin'))->get('/admin/audit?type=interest')->assertOk()->assertSee('GoTry automation');
     }
 
+    public function test_parent_sees_scoped_offer_notices_and_decline_and_expiry_outcomes(): void
+    {
+        $service = app(ParentInterests::class);
+        $holder = $this->user();
+        $seat = $this->register($holder, 1);
+        $first = $this->user();
+        $second = $this->user();
+        $input = ['child_name' => 'Waiting child', 'child_age' => 8, 'trial_session' => 1, 'expected_activity_version' => 2];
+        $entry = $service->register($first, $this->activity->id, $input, true);
+        $service->register($second, $this->activity->id, $input, true);
+        $service->change($holder, $seat->id, 'withdraw', ['expected_version' => 1]);
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+
+        $this->actingAs($second)->get('/notifications')->assertOk()->assertDontSee('Review seat offer');
+        $this->actingAs($first)->get('/notifications')->assertOk()->assertSee('Review seat offer')
+            ->assertSee('href="'.route('parent.dashboard').'"', false);
+        $this->get('/parent')->assertOk()->assertSee('Accept by')->assertSee('Decline offer');
+        $this->post('/parent/interests/'.$entry->id.'/waitlist', [
+            'decision' => 'leave', 'expected_version' => 2, 'expected_activity_version' => 3,
+        ])->assertRedirect('/parent');
+        $this->get('/parent')->assertOk()->assertSee('Offer declined')->assertDontSee('Accept seat offer');
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+        $this->actingAs($second)->get('/notifications')->assertOk()->assertSee('Review seat offer');
+        $this->travel(24)->hours();
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+        $this->get('/notifications')->assertOk()->assertSee('Seat offer expired');
+        $this->get('/parent')->assertOk()->assertSee('Offer expired')->assertDontSee('Accept seat offer')
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
+
     public function test_processing_expires_existing_offers_without_refilling_closed_sessions(): void
     {
         $service = app(ParentInterests::class);
