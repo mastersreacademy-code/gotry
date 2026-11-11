@@ -31,10 +31,19 @@
     <section class="panel discovery-trial" id="trial">
         <p class="eyebrow">Free introductory trial</p>
         <h2>Register interest for the trial</h2>
-        <p class="activity-deadline"><strong>Register interest by</strong> {{ $details['deadline'] }}</p>
-        @if($sessions === [] && $details['trial_type'] === 'group')
-            <p>{{ $details['trial_date'] }} at {{ $details['trial_time'] }} · Sydney</p>
-        @elseif($details['trial_type'] === 'individual')
+        <div class="activity-deadline">
+            <strong>Register interest by</strong>
+            <time datetime="{{ $details['deadline'] }}">{{ \Illuminate\Support\Carbon::parse($details['deadline'])->format('D, j M Y') }}</time>
+        </div>
+        @if($details['trial_type'] === 'group')
+            <dl class="activity-trial-facts">
+                @if($sessions === [])
+                    <div><dt>Trial date</dt><dd><time datetime="{{ $details['trial_date'] }}">{{ \Illuminate\Support\Carbon::parse($details['trial_date'])->format('D, j M Y') }}</time></dd></div>
+                    <div><dt>Start time</dt><dd>{{ $details['trial_time'] }} · Sydney</dd></div>
+                @endif
+                <div><dt>Group size{{ $sessions !== [] ? ' per session' : '' }}</dt><dd>{{ $details['trial_min'] }}–{{ $availability['capacity'] }} children</dd></div>
+            </dl>
+        @else
             <p class="preserve-lines">Ask provider about availability: {{ $details['trial_availability'] }}</p>
         @endif
         @php($openSessions = array_filter($sessions, fn ($session) => $session['open'] || $session['can_waitlist']))

@@ -128,3 +128,19 @@
 .activity-price strong { display: block; font-size: clamp(1.5rem, 4vw, 2.25rem); color: #102d6b; }
 .activity-steps { padding-left: 1.4rem; line-height: 1.6; }
 .activity-steps li::marker { color: #b51560; font-weight: 750; }
+
+.activity-deadline,
+.activity-trial-facts > div {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .25rem .75rem;
+}
+.activity-deadline { margin: .9rem 0; }
+.activity-deadline time { font-weight: 750; }
+.activity-trial-facts { display: grid; gap: .5rem; margin: 1rem 0; }
+.activity-trial-facts > div { background: #edf5ff; padding: .65rem .8rem; border-radius: 10px; }
+.activity-trial-facts > div:nth-child(even) { background: #fff5df; }
+.activity-trial-facts dt { color: #465571; }
+.activity-trial-facts dd { margin: 0; font-weight: 750; }
