@@ -144,3 +144,13 @@
 .activity-trial-facts > div:nth-child(even) { background: #fff5df; }
 .activity-trial-facts dt { color: #465571; }
 .activity-trial-facts dd { margin: 0; font-weight: 750; }
+
+.activity-price .activity-price-amount { margin-top: .65rem; }
+.activity-final-action { text-align: center; margin: 1.25rem 0 0; }
+.activity-final-action .button {
+    width: min(100%, 36rem);
+    border-radius: 999px;
+    padding: .9rem 1rem;
+    font-size: clamp(1rem, 3vw, 1.35rem);
+}
+.activity-final-action p { margin: .55rem 0 0; font-size: .875rem; }

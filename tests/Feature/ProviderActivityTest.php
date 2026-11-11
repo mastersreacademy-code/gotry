@@ -203,7 +203,7 @@ class ProviderActivityTest extends TestCase
         $this->post('/admin/activities/1/decision', ['action' => 'approve', 'expected_version' => 1])->assertRedirect();
         $this->post('/admin/activities/1/decision', ['action' => 'approve', 'expected_version' => 1])->assertStatus(409);
         $this->assertDatabaseCount('activity_events', 2);
-        $this->get('/activities/1')->assertOk()->assertSee('$180.00')->assertDontSee('private-contact@example.test')->assertDontSee('Private Contact')->assertDontSee('0412345678');
+        $this->get('/activities/1')->assertOk()->assertSee('$180.00')->assertSee('10 lessons per term')->assertSee('10–12 children')->assertSee('8–9 children')->assertSee('Register interest for the trial')->assertDontSee('private-contact@example.test')->assertDontSee('Private Contact')->assertDontSee('0412345678');
         Activity::firstOrFail()->update(['status' => 'pending_approval', 'version' => 3]);
         $this->post('/admin/activities/1/decision', ['action' => 'reject', 'expected_version' => 3, 'reason' => 'Please confirm venue permission.'])->assertRedirect();
         $this->get('/activities/1')->assertNotFound();
