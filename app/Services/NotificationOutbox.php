@@ -26,14 +26,22 @@ class NotificationOutbox
 
     public function interest(InterestEvent $event, Interest $interest, Activity $activity): void
     {
+        $actor = $event->action === 'offered' ? $activity->provider_id : $interest->parent_id;
+        $validActor = (int) $event->actor_id === $actor
+            || ($event->action === 'offer_expired' && (int) $event->actor_id === $activity->provider_id);
         if ((int) $event->interest_id !== $interest->id || (int) $event->version !== $interest->version
-            || (int) $event->actor_id !== $interest->parent_id || $interest->activity_id !== $activity->id) {
+            || ! $validActor || $interest->activity_id !== $activity->id) {
             throw new LogicException('Outbox event does not match interest state.');
         }
         [$title, $parentCopy, $providerCopy] = match ($event->action) {
             'registered' => ['Interest registered', 'Your interest was registered.', 'A new interest was registered.'],
             'withdrawn' => ['Interest withdrawn', 'Your interest was withdrawn.', 'An interest registration was withdrawn.'],
             'transferred' => ['Trial session changed', 'Your interest moved to another session.', 'An interest registration moved to another session.'],
+            'waitlisted' => ['Waitlist joined', 'You joined the session waitlist.', 'A family joined the session waitlist.'],
+            'offered' => ['Seat offered', 'A seat is reserved for you until '.$event->offer_expires_at?->copy()->setTimezone('Australia/Sydney')->format('Y-m-d H:i T').'. Accept it on your dashboard.', 'A waitlisted family received a time-limited seat offer.'],
+            'offer_accepted' => ['Seat offer accepted', 'You accepted the offer and registered interest.', 'A family accepted a seat offer.'],
+            'waitlist_left' => ['Waitlist left', 'You left the waitlist or declined the offer.', 'A family left the waitlist or declined an offer.'],
+            'offer_expired' => ['Seat offer expired', 'Your seat offer expired.', 'A seat offer expired.'],
             'restored' => ['Interest restored', 'Your interest was restored.', 'An interest registration was restored.'],
             default => throw new LogicException('Unsupported interest notification event.'),
         };
@@ -66,7 +74,10 @@ class NotificationOutbox
             'interest_event_id' => null, 'activity_event_id' => $event->id, 'kind' => $kind, 'title' => $title,
             'message' => $copy.$context]);
         if (! in_array($event->action,['approve','reject'],true)) {
-            $interests = Interest::where('activity_id', $activity->id)->where('status', 'interested');
+            $statuses = in_array($event->action, ['rescheduled', 'cancel_admin', 'cancel_low_numbers'], true)
+                ? ['interested', 'waitlisted', 'offered']
+                : ['interested'];
+            $interests = Interest::where('activity_id', $activity->id)->whereIn('status', $statuses);
             if ($session !== null) {
                 $interests->where('trial_session', $session);
             } elseif ($event->action === 'cancel_admin' && TrialSchedule::sessions($activity) !== []) {

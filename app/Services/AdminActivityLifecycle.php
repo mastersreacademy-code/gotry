@@ -28,6 +28,8 @@ class AdminActivityLifecycle
                 $minimum = (int)($details['trial_min'] ?? 0);
                 abort_unless($minimum >= 1 && $minimum <= 100,409,'Review the trial group minimum first.');
                 if ($action === 'confirm_minimum') {
+                    abort_if($session !== null && app(ParentInterests::class)->seatHolds($activity, $session)->exists(),
+                        409, 'Wait for outstanding seat offers to be accepted, declined or expire before confirming.');
                     abort_unless($count >= $minimum,409,'The trial has not reached its minimum interest.');
                     abort_unless(User::whereKey($activity->provider_id)->where('is_active',true)->exists(),409,'The provider account is suspended.');
                     try { $start = TrialSchedule::startsAt($sessions[$session] ?? (($details['trial_date'] ?? '').' '.($details['trial_time'] ?? ''))); }

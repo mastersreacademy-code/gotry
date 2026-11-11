@@ -30,8 +30,23 @@ class ParentInterestController
     public function store(Request $request, Activity $activity, ParentInterests $service)
     {
         $request->validate(['interest_terms' => ['accepted']]);
-        $service->register($request->user(), $activity->id, $request->all());
+        $request->validate(['waitlist' => ['sometimes', 'in:1']]);
+        $waitlist = $request->boolean('waitlist');
+        $service->register($request->user(), $activity->id, $request->all(), $waitlist);
+        if ($waitlist) return redirect()->route('parent.dashboard')->with('status', 'Joined the session waitlist.');
         return redirect()->route('parent.dashboard')->with('status', 'Interest registered. This is not a confirmed booking or payment request.');
+    }
+
+    public function waitlist(Request $request, Interest $interest, ParentInterests $service)
+    {
+        abort_unless($interest->parent_id === $request->user()->id, 404);
+        $data = $request->validate([
+            'decision' => ['required', 'in:accept,leave'],
+            'expected_version' => ['required', 'integer', 'min:1'],
+            'expected_activity_version' => ['required', 'integer', 'min:1'],
+        ]);
+        $service->respondToWaitlist($request->user(), $interest->id, $data);
+        return redirect()->route('parent.dashboard')->with('status', $data['decision'] === 'accept' ? 'Seat offer accepted.' : 'Waitlist entry closed.');
     }
 
     public function transfer(Request $request, Interest $interest, ParentInterests $service)

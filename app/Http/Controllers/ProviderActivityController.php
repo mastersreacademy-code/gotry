@@ -88,6 +88,17 @@ class ProviderActivityController
         return view('provider.show', ['activity' => $activity, 'sessions' => $interests->sessionSummary($activity), 'review' => $this->review($schema, $activity->details), 'prices' => $pricing->preview($activity->details)]);
     }
 
+    public function offer(Request $request, Activity $activity, ParentInterests $service)
+    {
+        abort_unless($activity->provider_id === $request->user()->id, 404);
+        $data = $request->validate([
+            'trial_session' => ['required', 'integer', 'between:1,10'],
+            'expected_activity_version' => ['required', 'integer', 'min:1'],
+        ]);
+        $service->offerNext($request->user(), $activity->id, (int) $data['trial_session'], (int) $data['expected_activity_version']);
+        return redirect()->route('provider.activity', $activity)->with('status', 'Seat offered to the next eligible family.');
+    }
+
     public function reschedule(Request $request, Activity $activity, ProviderTrialRescheduling $service)
     {
         abort_unless($activity->provider_id === $request->user()->id, 404);

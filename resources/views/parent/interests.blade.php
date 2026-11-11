@@ -18,7 +18,11 @@
         $slot = $availability[$activity->id][$interest->trial_session ?? 0];
     @endphp
     <article>
-        <span class="status {{ $interest->status === 'interested' ? 'status-pending_registrations' : 'status-withdrawn' }}">{{ $interest->status === 'interested' ? 'Interest registered' : 'Withdrawn' }}</span>
+        <span class="status {{ $interest->status === 'interested' ? 'status-pending_registrations' : 'status-withdrawn' }}">{{ match($interest->status) {
+            'interested' => 'Interest registered', 'waitlisted' => 'On waitlist',
+            'offered' => $interest->offer_expires_at->isFuture() ? 'Seat offered' : 'Offer expired',
+            default => 'Withdrawn',
+        } }}</span>
         <h2>@if($activity->status === 'pending_registrations')<a href="{{ route('activities.show', $activity) }}">{{ $activity->title }}</a>@else{{ $activity->title }}@endif</h2>
         <p>{{ $interest->child_name }} · Age {{ $interest->child_age }}</p>
         <p>Activity status: {{ $activity->statusLabel() }}</p>
@@ -46,6 +50,16 @@
                 <button type="submit">Move interest</button>
             </form>
             @endif
+        @elseif(in_array($interest->status, ['waitlisted', 'offered'], true))
+            <form method="post" action="{{ route('parent.waitlist', $interest) }}">@csrf
+                <input type="hidden" name="expected_version" value="{{ $interest->version }}">
+                <input type="hidden" name="expected_activity_version" value="{{ $activity->version }}">
+                @if($interest->status === 'offered' && $interest->offer_expires_at->isFuture() && $slot['accepting_offers'])
+                    <p>Accept by {{ $interest->offer_expires_at->copy()->setTimezone('Australia/Sydney')->format('Y-m-d H:i T') }}.</p>
+                    <button type="submit" name="decision" value="accept">Accept seat offer</button>
+                @endif
+                <button class="secondary" type="submit" name="decision" value="leave">Leave waitlist</button>
+            </form>
         @elseif($slot['open'])
             <form method="post" action="{{ route('parent.restore', $interest) }}">@csrf
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">
