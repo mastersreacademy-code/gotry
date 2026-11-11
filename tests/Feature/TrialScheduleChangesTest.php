@@ -79,6 +79,27 @@ class TrialScheduleChangesTest extends TestCase
             ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
     }
 
+    public function test_stale_trial_form_returns_parent_to_current_options_without_changing_intent(): void
+    {
+        $holder = $this->user();
+        $seat = $this->register($holder, 1);
+        $path = '/activities/'.$this->activity->id;
+        $input = ['child_name' => 'Waiting child', 'child_age' => 8, 'trial_session' => 1,
+            'expected_activity_version' => 2, 'interest_terms' => 1, 'return_to_trial' => 1];
+
+        $this->actingAs($this->user())->post($path.'/interest', $input)
+            ->assertRedirect($path.'#trial')->assertSessionHasErrors('trial')->assertSessionHasInput('child_name', 'Waiting child');
+        $this->get($path)->assertOk()->assertSee('This trial is full')->assertSee('data-intent="waitlist"', false);
+        $this->assertDatabaseCount('interests', 1);
+
+        app(ParentInterests::class)->change($holder, $seat->id, 'withdraw', ['expected_version' => 1]);
+        $this->post($path.'/interest', [...$input, 'waitlist' => 1])
+            ->assertRedirect($path.'#trial')->assertSessionHasErrors('trial')->assertSessionHasInput('trial_session', 1);
+        $this->get($path)->assertOk()->assertSee('no longer taking waitlist entries')
+            ->assertSee('data-intent="register"', false)->assertDontSee('data-intent="waitlist"', false);
+        $this->assertDatabaseCount('interests', 1);
+    }
+
     public function test_transfer_checks_ownership_capacity_and_versions_and_keeps_a_single_interest(): void
     {
         $parent = $this->user();

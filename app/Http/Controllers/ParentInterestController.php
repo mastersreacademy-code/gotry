@@ -7,6 +7,7 @@ use App\Models\Interest;
 use App\Services\ParentInterests;
 use App\Services\TrialSchedule;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class ParentInterestController
 {
@@ -38,7 +39,17 @@ class ParentInterestController
         $request->validate(['interest_terms' => ['accepted']]);
         $request->validate(['waitlist' => ['sometimes', 'in:1']]);
         $waitlist = $request->boolean('waitlist');
-        $service->register($request->user(), $activity->id, $request->all(), $waitlist);
+        try {
+            $service->register($request->user(), $activity->id, $request->all(), $waitlist);
+        } catch (HttpExceptionInterface $error) {
+            if ($error->getStatusCode() !== 409 || ! $request->boolean('return_to_trial') || $request->expectsJson()) {
+                throw $error;
+            }
+
+            return redirect()->to(route('activities.show', $activity).'#trial')
+                ->withErrors(['trial' => $error->getMessage()])
+                ->withInput($request->only(['child_name', 'child_age', 'trial_session']));
+        }
         if ($waitlist) return redirect()->route('parent.dashboard')->with('status', 'Joined the session waitlist.');
         return redirect()->route('parent.dashboard')->with('status', 'Interest registered. This is not a confirmed booking or payment request.');
     }
