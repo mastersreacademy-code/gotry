@@ -21,7 +21,12 @@ class ProviderActivityController
 
     public function index(Request $request)
     {
-        return view('provider.index', ['activities' => Activity::where('provider_id', $request->user()->id)->latest('id')->paginate(20)]);
+        return view('provider.index', [
+            'activities' => Activity::where('provider_id', $request->user()->id)->latest('id')->paginate(20),
+            'draftStep' => $request->session()->has($this->key($request))
+                ? min(5, $request->session()->get($this->key($request).'.completed', 0) + 1)
+                : null,
+        ]);
     }
 
     public function create(Request $request, ActivityDraft $schema, ProgrammePricing $pricing, ?int $step = null)

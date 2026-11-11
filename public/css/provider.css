@@ -1,0 +1,121 @@
+.provider-ui {
+    --provider-ink: #172749;
+    --provider-muted: #53617a;
+    --provider-line: #e1e7f1;
+    --provider-action: #b51560;
+    color: var(--provider-ink);
+}
+
+.provider-ui a { text-underline-offset: .2em; }
+.provider-ui :is(button, .button):not(.secondary) { background: var(--provider-action); color: #fff; }
+.provider-ui :is(button, .button):not(.secondary):hover { background: #94104d; }
+.provider-ui :is(input, select, textarea, summary):focus-visible { outline: 3px solid #246dcc; outline-offset: 3px; }
+.provider-ui :is(h1, h2, h3, .status) { overflow-wrap: anywhere; }
+
+.provider-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    padding: clamp(1.5rem, 5vw, 3.25rem);
+    border-radius: 24px;
+    background: radial-gradient(ellipse at top right, #3d3768, transparent 65%), #172749;
+    color: #fff;
+}
+.provider-banner h1 { margin: .35rem 0 .55rem; letter-spacing: -.04em; }
+.provider-banner p { margin: 0; color: #e0e8fb; }
+.provider-banner .eyebrow { color: #ffc1dc; }
+.provider-banner a:not(.button) { color: #e0e8fb; }
+.provider-ui .provider-banner .button:not(.secondary) { background: #fff; color: #981252; }
+.provider-ui .provider-banner .button:not(.secondary):hover { background: #ffeaf3; }
+
+.provider-draft, .provider-list-heading, .provider-list-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .65rem 1rem;
+}
+.provider-draft {
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid #d9e4fa;
+    border-radius: 16px;
+    background: #edf3ff;
+}
+.provider-draft p, .provider-list-heading h2 { margin: 0; }
+.provider-list-heading { margin: 2rem 0 1rem; }
+.provider-list-heading span, .provider-list-meta { color: var(--provider-muted); font-size: .875rem; }
+.provider-list article { min-width: 0; }
+.provider-list h3 { margin: 1rem 0 .4rem; font-size: 1.4rem; }
+.provider-list h3 a { color: var(--provider-ink); }
+.provider-list article p { margin: .3rem 0; }
+.provider-empty {
+    grid-column: 1 / -1;
+    padding: clamp(1.25rem, 4vw, 2.5rem);
+    border: 1px dashed #b9c8df;
+    border-radius: 18px;
+    background: #fff;
+}
+.provider-empty :is(h3, p) { margin: 0; }
+.provider-empty p { margin-top: .5rem; }
+
+.provider-ui.wizard { padding: clamp(1.125rem, 4vw, 2.5rem); }
+.wizard-heading { color: var(--provider-muted); font-size: .875rem; }
+.provider-ui .wizard-steps {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0;
+    margin: 1.5rem 0 2rem;
+}
+.provider-ui .wizard-steps li {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    gap: .45rem;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+.provider-ui .wizard-steps li:not(:first-child)::before {
+    content: "";
+    position: absolute;
+    top: 1rem;
+    right: 50%;
+    width: 100%;
+    height: 2px;
+    background: var(--provider-line);
+}
+.provider-ui .wizard-steps :is(.complete, [aria-current])::before { background: #5576ae; }
+.step-dot {
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border: 1px solid var(--provider-line);
+    border-radius: 50%;
+    background: #f7f9fd;
+    font-weight: 750;
+}
+.complete .step-dot { background: #e4f4eb; color: #126247; border-color: #d0e9db; }
+[aria-current="step"] .step-dot { background: #174a95; color: #fff; border-color: #174a95; }
+
+.provider-management { margin-top: 1rem; }
+.provider-management > .review-section:first-child { margin-top: 0; }
+.provider-management > form { margin-bottom: 1rem; }
+.provider-record { border-top: 1px solid var(--provider-line); padding-top: 1rem; }
+.provider-record summary { cursor: pointer; font-weight: 700; }
+.provider-detail .status:not([class*="status-pending"]):not(.status-rejected) { background: #edf3ff; color: #172749; }
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+@media (max-width: 520px) {
+    .wizard-steps .step-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .provider-banner { border-radius: 18px; }
+}

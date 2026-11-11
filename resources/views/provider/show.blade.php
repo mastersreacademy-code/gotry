@@ -1,13 +1,20 @@
 @extends('layouts.app')
 @section('title', $activity->title.' · GoTry')
+@push('styles')
+<link rel="stylesheet" href="{{ asset('css/provider.css') }}">
+@endpush
 @section('content')
-<section class="panel">
-    <a href="{{ route('provider.dashboard') }}">← Your activities</a>
-    <h1>{{ $activity->title }}</h1><span class="status status-{{ $activity->status }}">{{ $activity->statusLabel() }}</span>
+<section class="provider-ui provider-detail">
+    <div class="provider-banner">
+        <div>
+            <a href="{{ route('provider.dashboard') }}">← Your activities</a>
+            <h1>{{ $activity->title }}</h1>
+            <span class="status status-{{ $activity->status }}">{{ $activity->statusLabel() }}</span>
+        </div>
+    </div>
     @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
     @if($activity->review_reason)<p class="notice"><strong>Admin feedback:</strong> {{ $activity->review_reason }}</p>@endif
-    @include('provider.partials.review')
-    @include('provider.partials.prices')
+    <div class="panel provider-management">
     @include('provider.partials.trial-sessions')
     @if($errors->any())<p class="error" role="alert">{{ $errors->first() }}</p>@endif
     @foreach($sessions as $number => $session)
@@ -40,5 +47,11 @@
         <button type="submit">Reschedule trial</button>
     </form>
     @endif
+    <details class="provider-record" @if($sessions === []) open @endif>
+        <summary>Listing details and pricing</summary>
+        @include('provider.partials.review')
+        @include('provider.partials.prices')
+    </details>
+    </div>
 </section>
 @endsection
