@@ -1,15 +1,29 @@
 @extends('layouts.app')
+@push('styles')
+<link rel="stylesheet" href="{{ asset('css/discovery.css') }}">
+@endpush
 @section('content')
-<section class="hero">
-    <p class="eyebrow">A little discovery. A world of possibility.</p>
-    <h1>Try before you <span>enrol.</span></h1>
-    <p>Discover activities your child will love. Meet providers and explore an introductory trial before choosing regular lessons.</p>
-    <a class="button" href="{{ route('activities.index') }}">Explore activities →</a>
-    <p>New to GoTry? <a href="{{ route('register') }}">Create your account</a>.</p>
-</section>
-<div class="grid">
-    <article><h2>For families</h2><p>Explore approved activities, register your child’s interest and manage registrations from your dashboard.</p></article>
-    <article><h2>For providers</h2><p>List your activity, add trial and regular lesson details, and submit it for review.</p></article>
+<div class="discovery-ui">
+    <section class="discovery-hero">
+        <div>
+            <h1>Try before you <em>enrol.</em></h1>
+            <p>Find a free introductory activity for your child and get to know the provider before choosing regular lessons.</p>
+            <a class="button" href="{{ route('activities.index') }}">Explore activities →</a>
+        </div>
+        <div class="discovery-guide">
+            <h2>How trials work</h2>
+            <ol>
+                <li><strong>Find a trial</strong><span>Check the age range, venue and session times.</span></li>
+                <li><strong>Register interest</strong><span>Join the waitlist if the session is full.</span></li>
+                <li><strong>Check your dashboard</strong><span>Follow your registration and respond to seat offers.</span></li>
+            </ol>
+        </div>
+    </section>
+    @guest
+        <section class="panel discovery-provider">
+            <div><h2>Run activities for children?</h2><p>Create a provider account to submit a trial for review.</p></div>
+            <a class="button secondary" href="{{ route('register') }}">Create an account →</a>
+        </section>
+    @endguest
 </div>
-<p class="notice">Registering interest is free. It does not confirm a booking or collect payment.</p>
 @endsection

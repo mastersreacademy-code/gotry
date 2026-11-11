@@ -11,9 +11,20 @@ use Illuminate\Http\Request;
 
 class ActivityDiscoveryController
 {
-    public function index()
+    public function index(ParentInterests $interests)
     {
-        return view('activities.index', ['activities' => Activity::where('status', 'pending_registrations')->whereHas('provider',fn($query)=>$query->where('is_active',true))->latest('id')->paginate(20)]);
+        $activities = Activity::where('status', 'pending_registrations')
+            ->whereHas('provider', fn ($query) => $query->where('is_active', true))
+            ->latest('id')->paginate(20);
+        $availability = [];
+        foreach ($activities as $activity) {
+            $availability[$activity->id] = [];
+            foreach (array_keys(TrialSchedule::sessions($activity)) ?: [null] as $session) {
+                $availability[$activity->id][] = $interests->availability($activity, session: $session);
+            }
+        }
+
+        return view('activities.index', compact('activities', 'availability'));
     }
 
     public function show(Request $request, Activity $activity, ProgrammePricing $pricing, ParentInterests $interests)
