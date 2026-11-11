@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Interest extends Model
 {
@@ -14,6 +15,11 @@ class Interest extends Model
     {
         return ['offer_expires_at' => 'datetime', 'activity_id' => 'integer', 'trial_session' => 'integer', 'parent_id' => 'integer', 'child_age' => 'integer',
             'version' => 'integer', 'activity_version' => 'integer', 'withdrawn_at' => 'datetime'];
+    }
+
+    public function latestEvent(): HasOne
+    {
+        return $this->hasOne(InterestEvent::class)->ofMany('version', 'max');
     }
 
     public function activity(): BelongsTo

@@ -11,7 +11,7 @@
     <p>{{ $notification->message }}</p>
     <p class="text-small">{{ $notification->created_at->timezone('Australia/Sydney')->format('j M Y, g:i a') }} · Sydney</p>
     <div class="notice-actions">
-        <a href="{{ $notification->destination() }}">Open dashboard details →</a>
+        <a href="{{ $notification->destination() }}">{{ $notification->kind === 'parent_offered' ? 'Review seat offer' : 'Open dashboard details' }} →</a>
         @unless($notification->read_at)<form method="post" action="{{ route('notifications.read', $notification) }}">@csrf<button class="secondary" type="submit">Mark as read</button></form>@endunless
     </div>
 </article>
