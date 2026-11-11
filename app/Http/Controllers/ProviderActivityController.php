@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Activity;
 use App\Models\ActivityEvent;
 use App\Services\ActivityDraft;
+use App\Services\ParentInterests;
 use App\Services\ProgrammePricing;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -80,10 +81,10 @@ class ProviderActivityController
         return redirect()->route('provider.activity', $activity)->with('status', 'Submitted for approval.');
     }
 
-    public function show(Request $request, Activity $activity, ActivityDraft $schema, ProgrammePricing $pricing)
+    public function show(Request $request, Activity $activity, ActivityDraft $schema, ProgrammePricing $pricing, ParentInterests $interests)
     {
         abort_unless($activity->provider_id === $request->user()->id, 404);
-        return view('provider.show', ['activity' => $activity, 'review' => $this->review($schema, $activity->details), 'prices' => $pricing->preview($activity->details)]);
+        return view('provider.show', ['activity' => $activity, 'sessions' => $interests->sessionSummary($activity), 'review' => $this->review($schema, $activity->details), 'prices' => $pricing->preview($activity->details)]);
     }
 
     public function review(ActivityDraft $schema, array $data): array

@@ -38,14 +38,16 @@ class NotificationOutbox
         };
         $base = ['activity_id' => $activity->id, 'interest_event_id' => $event->id, 'activity_event_id' => null, 'title' => $title];
         $this->enqueue('interest:'.$event->id, $interest->parent_id, [...$base, 'kind' => 'parent_'.$event->action,
-            'message' => $parentCopy.' Activity: '.$activity->title.'. This is not a confirmed booking or payment request.']);
+            'message' => $parentCopy.$this->trialContext($activity, $interest->trial_session).' This is not a confirmed booking or payment request.']);
         $this->enqueue('interest:'.$event->id, $activity->provider_id, [...$base, 'kind' => 'provider_'.$event->action,
-            'message' => $providerCopy.' Activity: '.$activity->title.'. No child or parent details are included in this notice.']);
+            'message' => $providerCopy.$this->trialContext($activity, $interest->trial_session).' No child or parent details are included in this notice.']);
     }
 
     public function activity(ActivityEvent $event, Activity $activity): void
     {
-        if ((int) $event->activity_id !== $activity->id || $event->to_status !== $activity->status) throw new LogicException('Outbox event does not match activity state.');
+        $session = $event->trial_session === null ? null : (int) $event->trial_session;
+        $status = $session === null ? $activity->status : TrialSchedule::status($activity, $session);
+        if ((int) $event->activity_id !== $activity->id || $event->to_status !== $status) throw new LogicException('Outbox event does not match activity state.');
         [$kind, $title, $copy] = match ($event->action) {
             'approve' => ['activity_approved', 'Activity approved', 'Your activity listing was approved. Parents can now register interest.'],
             'reject' => ['activity_rejected', 'Activity rejected', 'Your activity listing was rejected. Open your provider dashboard to review the feedback.'],
@@ -58,12 +60,27 @@ class NotificationOutbox
         // Feedback/contact details stay on the authorized activity page, not in copied payloads.
         $this->enqueue('activity:'.$event->id, $activity->provider_id, ['activity_id' => $activity->id,
             'interest_event_id' => null, 'activity_event_id' => $event->id, 'kind' => $kind, 'title' => $title,
-            'message' => $copy.' Activity: '.$activity->title.'.']);
+            'message' => $copy.$this->trialContext($activity, $session)]);
         if (! in_array($event->action,['approve','reject'],true)) {
-            $parents = Interest::where('activity_id',$activity->id)->where('status','interested')->distinct()->pluck('parent_id');
+            $interests = Interest::where('activity_id', $activity->id)->where('status', 'interested');
+            if ($session !== null) {
+                $interests->where('trial_session', $session);
+            } elseif ($event->action === 'cancel_admin' && TrialSchedule::sessions($activity) !== []) {
+                $open = array_filter(array_keys(TrialSchedule::sessions($activity)), fn ($number) =>
+                    in_array(TrialSchedule::status($activity, $number), ['pending_registrations', 'proceeding_pending_payments'], true));
+                $interests->whereIn('trial_session', $open);
+            }
+            $parents = $interests->distinct()->pluck('parent_id');
             foreach ($parents as $parentId) $this->enqueue('activity:'.$event->id,(int)$parentId,['activity_id'=>$activity->id,
-                'interest_event_id'=>null,'activity_event_id'=>$event->id,'kind'=>'parent_'.$kind,'title'=>$title,'message'=>$copy.' Activity: '.$activity->title.'.']);
+                'interest_event_id'=>null,'activity_event_id'=>$event->id,'kind'=>'parent_'.$kind,'title'=>$title,'message'=>$copy.$this->trialContext($activity, $session)]);
         }
+    }
+
+    private function trialContext(Activity $activity, ?int $session): string
+    {
+        $start = TrialSchedule::sessions($activity)[$session] ?? null;
+
+        return ' Activity: '.$activity->title.'.'.($start === null ? '' : ' Trial session: '.$start.' (Sydney).');
     }
 
     public function deliver(User $recipient, int $limit = 50): int

@@ -14,10 +14,10 @@ use Illuminate\Support\Str;
 
 class ParentInterests
 {
-    public function availability(Activity $activity, ?int $count = null): array
+    public function availability(Activity $activity, ?int $count = null, ?int $session = null): array
     {
-        $count ??= Interest::where('activity_id', $activity->id)->where('status', 'interested')->count();
-        $reason = $this->closedReason($activity);
+        $count ??= $this->activeInterests($activity, $session)->count();
+        $reason = $this->closedReason($activity, $session);
         $group = ($activity->details['trial_type'] ?? null) === 'group';
         $capacity = $group ? (int) ($activity->details['trial_max'] ?? 0) : null;
         $remaining = $capacity === null ? null : max(0, $capacity - $count);
@@ -26,20 +26,53 @@ class ParentInterests
             'remaining' => $remaining, 'minimum_reached' => $group && $count >= (int) ($activity->details['trial_min'] ?? PHP_INT_MAX)];
     }
 
-    private function closedReason(Activity $activity): ?string
+    public function activeInterests(Activity $activity, ?int $session)
+    {
+        return Interest::where('activity_id', $activity->id)->where('trial_session', $session)->where('status', 'interested');
+    }
+
+    public function sessionSummary(Activity $activity): array
+    {
+        $sessions = TrialSchedule::sessions($activity);
+        if ($sessions === []) return [];
+
+        $counts = Interest::where('activity_id', $activity->id)->where('status', 'interested')
+            ->whereNotNull('trial_session')->groupBy('trial_session')->selectRaw('trial_session, count(*) as total')
+            ->pluck('total', 'trial_session');
+        foreach ($sessions as $number => $start) {
+            $sessions[$number] = [
+                'start' => $start,
+                'status' => $activity->status === 'pending_registrations' ? TrialSchedule::status($activity, $number) : $activity->status,
+                'count' => (int) ($counts[$number] ?? 0),
+            ];
+        }
+
+        return $sessions;
+    }
+
+    private function closedReason(Activity $activity, ?int $session): ?string
     {
         if ($activity->status !== 'pending_registrations') return 'This activity is not accepting interest.';
         if (! User::whereKey($activity->provider_id)->where('is_active',true)->exists()) return 'The provider is currently unavailable.';
         $data = $activity->details;
         $today = CarbonImmutable::now('Australia/Sydney');
         if (! isset($data['deadline']) || ! $this->validDate($data['deadline']) || $data['deadline'] < $today->toDateString()) return 'The registration deadline has passed.';
+        $sessions = TrialSchedule::sessions($activity);
+        if ($sessions !== []) {
+            if (! isset($sessions[$session])) return 'Select an available trial session.';
+            $status = TrialSchedule::status($activity, $session);
+            if ($status !== 'pending_registrations') return Activity::STATUSES[$status].'. This session is closed for registrations.';
+            [$data['trial_date'], $data['trial_time']] = explode(' ', $sessions[$session]);
+        } elseif ($session !== null) {
+            return 'Select an available trial.';
+        }
         if (($data['trial_type'] ?? null) === 'individual') return null;
         if (($data['trial_type'] ?? null) !== 'group' || ! $this->validDate($data['trial_date'] ?? '')
             || ! preg_match('/^\d{2}:\d{2}$/', $data['trial_time'] ?? '')
             || ! filter_var($data['trial_max'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100]])) return 'The trial details need provider review.';
         try {
             $local = $data['trial_date'].' '.$data['trial_time'];
-            $start = CarbonImmutable::createFromFormat('!Y-m-d H:i', $local, 'Australia/Sydney');
+            $start = TrialSchedule::startsAt($local);
             if ($start->format('Y-m-d H:i') !== $local || $start->lessThanOrEqualTo($today)) return 'The trial has already started or its schedule has changed.';
         } catch (\Throwable) { return 'The trial schedule needs provider review.'; }
         return null;
@@ -63,15 +96,15 @@ class ParentInterests
         return Activity::whereKey($activityId)->lockForUpdate()->firstOrFail();
     }
 
-    private function assertAccepting(Activity $activity, int $expectedVersion, int $age): void
+    private function assertAccepting(Activity $activity, int $expectedVersion, int $age, ?int $session): void
     {
         abort_unless($activity->status === 'pending_registrations', 404, 'Activity not available.');
         abort_unless($activity->version === $expectedVersion, 409, 'Activity details changed. Refresh and review them before registering.');
-        $reason = $this->closedReason($activity);
+        $reason = $this->closedReason($activity, $session);
         abort_if($reason !== null, 409, $reason ?? 'Registration closed.');
         $data = $activity->details;
         abort_unless($age >= (int) ($data['min_age'] ?? 19) && $age <= (int) ($data['max_age'] ?? 0), 422, 'The child is outside this activity’s age range.');
-        $availability = $this->availability($activity);
+        $availability = $this->availability($activity, session: $session);
         abort_unless($availability['open'], 409, $availability['reason'] ?? 'Trial unavailable.');
     }
 
@@ -87,19 +120,21 @@ class ParentInterests
         $this->assertParent($parent);
         if (is_string($input['child_name'] ?? null)) $input['child_name'] = Str::squish($input['child_name']);
         $data = Validator::make($input, ['child_name' => ['required','string','max:80'], 'child_age' => ['required','integer','between:1,18'],
-            'expected_activity_version' => ['required','integer','min:1']])->validate();
+            'expected_activity_version' => ['required','integer','min:1'], 'trial_session' => ['nullable','integer','between:1,10']])->validate();
         $key = hash('sha256', mb_strtolower($data['child_name']));
         return DB::transaction(function () use ($parent, $activityId, $data, $key) {
             $activity = $this->lockActivity($activityId);
+            $session = isset($data['trial_session']) ? (int) $data['trial_session'] : null;
             $existing = Interest::where('activity_id', $activity->id)->where('parent_id', $parent->id)->where('child_key', $key)->lockForUpdate()->first();
             if ($existing) {
                 // Retried old create forms never resurrect a withdrawn registration.
                 abort_unless($existing->status === 'interested', 409, 'This registration was withdrawn. Use Restore on your dashboard.');
                 abort_unless($existing->child_age === (int) $data['child_age'], 409, 'An active registration already exists for this child with different details.');
+                abort_unless($existing->trial_session === $session, 409, 'This child already has a registration for another session.');
                 return $existing;
             }
-            $this->assertAccepting($activity, (int) $data['expected_activity_version'], (int) $data['child_age']);
-            $interest = Interest::create(['activity_id' => $activity->id, 'parent_id' => $parent->id, 'child_name' => $data['child_name'],
+            $this->assertAccepting($activity, (int) $data['expected_activity_version'], (int) $data['child_age'], $session);
+            $interest = Interest::create(['activity_id' => $activity->id, 'trial_session' => $session, 'parent_id' => $parent->id, 'child_name' => $data['child_name'],
                 'child_key' => $key, 'child_age' => $data['child_age'], 'status' => 'interested', 'version' => 1, 'activity_version' => $activity->version]);
             $this->record($interest, $parent, 'registered', null, $activity);
             return $interest;
@@ -122,13 +157,16 @@ class ParentInterests
             if ($interest->status === $target && $interest->version === $expected + 1) return $interest;
             $source = $action === 'withdraw' ? 'interested' : 'withdrawn';
             abort_unless($interest->version === $expected && $interest->status === $source, 409, 'Registration changed. Refresh your dashboard and try again.');
-            if ($action === 'restore') $this->assertAccepting($activity, (int) $data['expected_activity_version'], $interest->child_age);
+            if ($action === 'restore') $this->assertAccepting($activity, (int) $data['expected_activity_version'], $interest->child_age, $interest->trial_session);
             $from = $interest->status;
             $interest->update(['status' => $target, 'version' => $interest->version + 1,
                 'activity_version' => $action === 'restore' ? $activity->version : $interest->activity_version,
                 'withdrawn_at' => $action === 'withdraw' ? now() : null]);
             $this->record($interest, $parent, $action === 'withdraw' ? 'withdrawn' : 'restored', $from, $activity);
-            if ($action === 'withdraw' && $activity->status === 'proceeding_pending_payments' && ($activity->details['trial_type'] ?? '') === 'group'
+            if ($action === 'withdraw' && $interest->trial_session !== null) {
+                app(AdminActivityLifecycle::class)->reopenSessionBelowMinimum($activity, $interest->trial_session, $parent);
+            }
+            if ($action === 'withdraw' && $interest->trial_session === null && $activity->status === 'proceeding_pending_payments' && ($activity->details['trial_type'] ?? '') === 'group'
                 && Interest::where('activity_id',$activity->id)->where('status','interested')->count() < (int)$activity->details['trial_min']) {
                 $activity->update(['status'=>'pending_registrations','version'=>$activity->version+1,'review_reason'=>'Interest fell below the required minimum; admin review is needed.']);
                 $event = ActivityEvent::create(['activity_id'=>$activity->id,'actor_id'=>$parent->id,'action'=>'minimum_lost',

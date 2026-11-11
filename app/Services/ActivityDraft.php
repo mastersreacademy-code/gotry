@@ -33,6 +33,7 @@ class ActivityDraft
                 ['trial_time', 'Trial start time (Sydney time)', 'time', [], ['trial_type', 'group']],
                 ['trial_min', 'Minimum participants to run', 'number', [], ['trial_type', 'group']],
                 ['trial_max', 'Maximum trial participants', 'number', [], ['trial_type', 'group']],
+                ['extra_trial_times', 'Additional trial starts (optional, one YYYY-MM-DD HH:MM per line, Sydney time)', 'textarea', [], ['trial_type', 'group']],
                 ['trial_availability', 'Trial availability', 'textarea', [], ['trial_type', 'individual']],
                 ['trial_duration', 'Trial duration (minutes)', 'number'],
                 ['deadline', 'Last date to register interest', 'date'],
@@ -61,6 +62,9 @@ class ActivityDraft
 
     public function validate(int $step, array $input): array
     {
+        if (is_string($input['extra_trial_times'] ?? null)) {
+            $input['extra_trial_times'] = implode("\n", array_map('trim', preg_split('/\R/', trim($input['extra_trial_times']))));
+        }
         $today = CarbonImmutable::now('Australia/Sydney')->toDateString();
         $money = ['numeric', 'decimal:0,2', 'min:0', 'max:100000'];
         $group = ($input['regular_format'] ?? null) === 'group';
@@ -82,6 +86,7 @@ class ActivityDraft
                 'trial_time' => ['exclude_unless:trial_type,group', 'required', 'date_format:H:i'],
                 'trial_min' => ['exclude_unless:trial_type,group', 'required', 'integer', 'between:1,100'],
                 'trial_max' => ['exclude_unless:trial_type,group', 'required', 'integer', 'between:1,100', 'gte:trial_min'],
+                'extra_trial_times' => ['exclude_unless:trial_type,group', 'nullable', 'string', 'max:180'],
                 'trial_availability' => ['exclude_unless:trial_type,individual', 'required', 'string', 'max:2000'],
                 'trial_duration' => ['required', 'integer', 'between:5,240'],
                 'deadline' => ['required', 'date_format:Y-m-d', 'after_or_equal:'.$today],
@@ -111,15 +116,21 @@ class ActivityDraft
             if ($validator->errors()->isNotEmpty()) return;
             if ($step === 3 && $input['trial_type'] === 'group') {
                 if ($input['deadline'] > $input['trial_date']) $validator->errors()->add('deadline', 'The deadline must be on or before the trial date.');
-                $local = $input['trial_date'].' '.$input['trial_time'];
-                $start = CarbonImmutable::createFromFormat('!Y-m-d H:i', $local, 'Australia/Sydney');
-                if ($start->format('Y-m-d H:i') !== $local || $start->isPast()) {
-                    $validator->errors()->add('trial_time', 'Choose a valid future Sydney date and time.');
+                $primary = $input['trial_date'].' '.$input['trial_time'];
+                $extra = empty($input['extra_trial_times']) ? [] : preg_split('/\R/', trim($input['extra_trial_times']));
+                $starts = [$primary, ...$extra];
+                if (count($starts) > 10 || count(array_unique($starts)) !== count($starts)) {
+                    $validator->errors()->add('extra_trial_times', 'Enter up to nine additional starts with no duplicates.');
                 }
-                // Sydney's repeated autumn hour is ambiguous without an explicit offset.
-                foreach ([-3600, 3600] as $offset) {
-                    if ($start->addSeconds($offset)->format('Y-m-d H:i') === $local) {
-                        $validator->errors()->add('trial_time', 'Choose a time outside the Sydney daylight-saving transition.');
+                foreach ($starts as $index => $local) {
+                    $field = $index === 0 ? 'trial_time' : 'extra_trial_times';
+                    try {
+                        $start = TrialSchedule::startsAt($local);
+                        if ($start->lessThanOrEqualTo(now()) || $start->toDateString() < $input['deadline']) {
+                            $validator->errors()->add($field, 'Each trial must start in the future and on or after the registration deadline.');
+                        }
+                    } catch (\Exception) {
+                        $validator->errors()->add($field, 'Choose a valid Sydney date and time outside daylight-saving transitions.');
                     }
                 }
             }

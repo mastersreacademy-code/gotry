@@ -13,7 +13,10 @@ class ParentInterestController
     {
         $interests = Interest::where('parent_id', $request->user()->id)->with('activity')->latest('id')->paginate(20);
         $availability = [];
-        foreach ($interests as $interest) $availability[$interest->activity_id] ??= $service->availability($interest->activity);
+        foreach ($interests as $interest) {
+            $key = $interest->trial_session ?? 0;
+            $availability[$interest->activity_id][$key] ??= $service->availability($interest->activity, session: $interest->trial_session);
+        }
         return view('parent.interests', compact('interests', 'availability'));
     }
 
