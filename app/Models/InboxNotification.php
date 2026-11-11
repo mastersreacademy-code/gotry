@@ -17,7 +17,7 @@ class InboxNotification extends Model
 
     public function destination(): string
     {
-        return str_starts_with($this->kind, 'parent_') ? route('parent.dashboard')
-            : route('provider.activity', ['activity' => $this->activity_id]);
+        return str_starts_with($this->kind, 'parent_') ? route('parent.dashboard', ['activity' => $this->activity_id])
+            : route('provider.activity', ['activity' => $this->activity_id]).'#trial-management';
     }
 }

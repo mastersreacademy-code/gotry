@@ -12,10 +12,13 @@ class ParentInterestController
 {
     public function index(Request $request, ParentInterests $service)
     {
-        $interests = Interest::where('parent_id', $request->user()->id)->with(['activity.provider', 'latestEvent'])
+        $activityFilter = filter_var($request->query('activity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $interests = Interest::where('parent_id', $request->user()->id)
+            ->when($activityFilter, fn ($query, $id) => $query->where('activity_id', $id))
+            ->with(['activity.provider', 'latestEvent'])
             ->orderByRaw("CASE WHEN status = 'offered' AND offer_expires_at > ? THEN 0 WHEN status IN ('interested', 'waitlisted') THEN 1 ELSE 2 END", [now()])
             ->orderByRaw("CASE WHEN status = 'offered' AND offer_expires_at > ? THEN offer_expires_at END", [now()])
-            ->latest('id')->paginate(20);
+            ->latest('id')->paginate(20)->appends($activityFilter ? ['activity' => $activityFilter] : []);
         $availability = [];
         $openSessions = [];
         foreach ($interests as $interest) {
@@ -27,7 +30,7 @@ class ParentInterestController
                 if ($service->availability($activity, session: $number)['open']) $openSessions[$activity->id][$number] = $start;
             }
         }
-        return view('parent.interests', compact('interests', 'availability', 'openSessions'));
+        return view('parent.interests', compact('interests', 'availability', 'openSessions', 'activityFilter'));
     }
 
     public function store(Request $request, Activity $activity, ParentInterests $service)
