@@ -66,7 +66,7 @@
                     <button type="submit" data-intent="waitlist" name="waitlist" value="1">Join waitlist →</button>
                 @endif
             </form>
-        @elseif(auth()->guest())<a class="button" href="{{ route('login') }}">Sign in as a parent to register interest</a>
+        @elseif(auth()->guest())<a class="button" href="{{ route('login', ['activity' => $activityId]) }}">Sign in as a parent to continue</a>
         @else<p>Parent accounts can register a child's interest. Your account is {{ auth()->user()->role }}.</p>@endif
     </section>
     <section class="panel discovery-programme">
