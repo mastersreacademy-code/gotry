@@ -18,17 +18,38 @@ class ParentInterests
     {
         $count ??= $this->activeInterests($activity, $session)->count();
         $reason = $this->closedReason($activity, $session);
+        $acceptingOffers = $session !== null && $reason === null;
         $group = ($activity->details['trial_type'] ?? null) === 'group';
         $capacity = $group ? (int) ($activity->details['trial_max'] ?? 0) : null;
-        $remaining = $capacity === null ? null : max(0, $capacity - $count);
+        $held = $session === null ? 0 : $this->seatHolds($activity, $session)->count();
+        $remaining = $capacity === null ? null : max(0, $capacity - $count - $held);
+        $waiting = $session !== null && $this->eligibleWaitlist($activity, $session)->exists();
+        $canWaitlist = $session !== null && $reason === null && ($remaining === 0 || $waiting);
+        if ($reason === null && $waiting && $remaining > 0) $reason = 'Available seats are offered to the waitlist first.';
         if ($reason === null && $remaining === 0) $reason = 'This trial is full. Please check again if a place becomes available.';
         return ['open' => $reason === null, 'reason' => $reason, 'count' => $count, 'capacity' => $capacity,
-            'remaining' => $remaining, 'minimum_reached' => $group && $count >= (int) ($activity->details['trial_min'] ?? PHP_INT_MAX)];
+            'remaining' => $remaining, 'can_waitlist' => $canWaitlist, 'accepting_offers' => $acceptingOffers, 'held' => $held, 'minimum_reached' => $group && $count >= (int) ($activity->details['trial_min'] ?? PHP_INT_MAX)];
     }
 
     public function activeInterests(Activity $activity, ?int $session)
     {
-        return Interest::where('activity_id', $activity->id)->where('trial_session', $session)->where('status', 'interested');
+        return $this->sessionInterests($activity, $session)->where('status', 'interested');
+    }
+
+    private function sessionInterests(Activity $activity, ?int $session)
+    {
+        return Interest::where('activity_id', $activity->id)->where('trial_session', $session);
+    }
+
+    private function eligibleWaitlist(Activity $activity, int $session)
+    {
+        return $this->sessionInterests($activity, $session)->where('status', 'waitlisted')
+            ->whereIn('parent_id', User::where('role', 'parent')->where('is_active', true)->select('id'));
+    }
+
+    public function seatHolds(Activity $activity, int $session)
+    {
+        return $this->sessionInterests($activity, $session)->where('status', 'offered')->where('offer_expires_at', '>', now());
     }
 
     public function sessionSummary(Activity $activity): array
@@ -44,6 +65,9 @@ class ParentInterests
                 'start' => $start,
                 'status' => $activity->status === 'pending_registrations' ? TrialSchedule::status($activity, $number) : $activity->status,
                 'count' => (int) ($counts[$number] ?? 0),
+                'can_offer' => $this->closedReason($activity, $number) === null
+                    && ($counts[$number] ?? 0) + $this->seatHolds($activity, $number)->count() < (int) $activity->details['trial_max'],
+                'waiting' => $this->eligibleWaitlist($activity, $number)->count(),
             ];
         }
 
@@ -96,7 +120,7 @@ class ParentInterests
         return Activity::whereKey($activityId)->lockForUpdate()->firstOrFail();
     }
 
-    private function assertAccepting(Activity $activity, int $expectedVersion, int $age, ?int $session): void
+    private function assertEligible(Activity $activity, int $expectedVersion, int $age, ?int $session): void
     {
         abort_unless($activity->status === 'pending_registrations', 404, 'Activity not available.');
         abort_unless($activity->version === $expectedVersion, 409, 'Activity details changed. Refresh and review them before registering.');
@@ -104,6 +128,11 @@ class ParentInterests
         abort_if($reason !== null, 409, $reason ?? 'Registration closed.');
         $data = $activity->details;
         abort_unless($age >= (int) ($data['min_age'] ?? 19) && $age <= (int) ($data['max_age'] ?? 0), 422, 'The child is outside this activity’s age range.');
+    }
+
+    private function assertAccepting(Activity $activity, int $expectedVersion, int $age, ?int $session): void
+    {
+        $this->assertEligible($activity, $expectedVersion, $age, $session);
         $availability = $this->availability($activity, session: $session);
         abort_unless($availability['open'], 409, $availability['reason'] ?? 'Trial unavailable.');
     }
@@ -111,34 +140,96 @@ class ParentInterests
     private function record(Interest $interest, User $actor, string $action, ?string $from, Activity $activity, ?array $scheduleChange = null): void
     {
         $event = InterestEvent::create(['interest_id' => $interest->id, 'actor_id' => $actor->id, 'action' => $action,
-            'from_status' => $from, 'to_status' => $interest->status, 'version' => $interest->version, 'schedule_change' => $scheduleChange]);
+            'from_status' => $from, 'to_status' => $interest->status, 'version' => $interest->version, 'schedule_change' => $scheduleChange, 'offer_expires_at' => $interest->offer_expires_at]);
         app(NotificationOutbox::class)->interest($event, $interest, $activity);
     }
 
-    public function register(User $parent, int $activityId, array $input): Interest
+    public function register(User $parent, int $activityId, array $input, bool $waitlist = false): Interest
     {
         $this->assertParent($parent);
         if (is_string($input['child_name'] ?? null)) $input['child_name'] = Str::squish($input['child_name']);
         $data = Validator::make($input, ['child_name' => ['required','string','max:80'], 'child_age' => ['required','integer','between:1,18'],
             'expected_activity_version' => ['required','integer','min:1'], 'trial_session' => ['nullable','integer','between:1,10']])->validate();
         $key = hash('sha256', mb_strtolower($data['child_name']));
-        return DB::transaction(function () use ($parent, $activityId, $data, $key) {
+        return DB::transaction(function () use ($parent, $activityId, $data, $key, $waitlist) {
             $activity = $this->lockActivity($activityId);
             $session = isset($data['trial_session']) ? (int) $data['trial_session'] : null;
             $existing = Interest::where('activity_id', $activity->id)->where('parent_id', $parent->id)->where('child_key', $key)->lockForUpdate()->first();
             if ($existing) {
                 // Retried old create forms never resurrect a withdrawn registration.
-                abort_unless($existing->status === 'interested', 409, 'This registration was withdrawn. Use Restore on your dashboard.');
+                abort_unless($waitlist ? in_array($existing->status, ['waitlisted', 'offered'], true) : $existing->status === 'interested',
+                    409, 'This child already has an entry. Manage it from your dashboard.');
                 abort_unless($existing->child_age === (int) $data['child_age'], 409, 'An active registration already exists for this child with different details.');
                 abort_unless($existing->trial_session === $session, 409, 'This child already has a registration for another session.');
                 return $existing;
             }
-            $this->assertAccepting($activity, (int) $data['expected_activity_version'], (int) $data['child_age'], $session);
+            if ($waitlist) {
+                $this->assertEligible($activity, (int) $data['expected_activity_version'], (int) $data['child_age'], $session);
+                abort_unless($this->availability($activity, session: $session)['can_waitlist'], 409, 'This session is not taking waitlist entries.');
+            } else {
+                $this->assertAccepting($activity, (int) $data['expected_activity_version'], (int) $data['child_age'], $session);
+            }
             $interest = Interest::create(['activity_id' => $activity->id, 'trial_session' => $session, 'parent_id' => $parent->id, 'child_name' => $data['child_name'],
-                'child_key' => $key, 'child_age' => $data['child_age'], 'status' => 'interested', 'version' => 1, 'activity_version' => $activity->version]);
-            $this->record($interest, $parent, 'registered', null, $activity);
+                'child_key' => $key, 'child_age' => $data['child_age'], 'status' => $waitlist ? 'waitlisted' : 'interested', 'version' => 1, 'activity_version' => $activity->version]);
+            $this->record($interest, $parent, $waitlist ? 'waitlisted' : 'registered', null, $activity);
             return $interest;
         }, 5);
+    }
+
+    public function offerNext(User $provider, int $activityId, int $session, int $version): void
+    {
+        abort_unless($provider->role === 'provider' && $provider->is_active, 403);
+        DB::transaction(function () use ($provider, $activityId, $session, $version): void {
+            $activity = $this->lockActivity($activityId);
+            abort_unless($activity->provider_id === $provider->id, 404);
+            abort_unless($activity->version === $version && $this->closedReason($activity, $session) === null,
+                409, 'This session is closed or has changed.');
+            $capacity = $this->availability($activity, session: $session);
+            abort_unless($capacity['remaining'] > 0, 409, 'There are no unreserved seats.');
+            $next = $this->eligibleWaitlist($activity, $session)->oldest('id')->lockForUpdate()->first();
+            abort_if($next === null, 409, 'There are no eligible families waiting for this session.');
+            $expires = min(CarbonImmutable::now()->addHours(24),
+                TrialSchedule::startsAt(TrialSchedule::sessions($activity)[$session]),
+                CarbonImmutable::parse($activity->details['deadline'], 'Australia/Sydney')->addDay()->startOfDay(),
+            );
+            // A duplicate provider form must not offer the next seat.
+            $activity->increment('version');
+            $expired = $this->sessionInterests($activity, $session)->where('status', 'offered')
+                ->where('offer_expires_at', '<=', now())->lockForUpdate()->get();
+            foreach ($expired as $entry) $this->updateWaitlist($entry, $provider, $activity, 'offer_expired', 'withdrawn');
+            $this->updateWaitlist($next, $provider, $activity, 'offered', 'offered', $expires->setTimezone(config('app.timezone')));
+        }, 5);
+    }
+
+    public function respondToWaitlist(User $parent, int $interestId, array $data): void
+    {
+        $this->assertParent($parent);
+        $snapshot = Interest::whereKey($interestId)->where('parent_id', $parent->id)->firstOrFail();
+        DB::transaction(function () use ($parent, $snapshot, $data): void {
+            $activity = $this->lockActivity($snapshot->activity_id);
+            $interest = Interest::whereKey($snapshot->id)->where('parent_id', $parent->id)->lockForUpdate()->firstOrFail();
+            abort_unless($interest->version === (int) $data['expected_version'] && in_array($interest->status, ['waitlisted', 'offered'], true),
+                409, 'The waitlist entry changed.');
+            if ($data['decision'] === 'leave') {
+                $expired = $interest->status === 'offered' && ! $interest->offer_expires_at->isFuture();
+                $this->updateWaitlist($interest, $parent, $activity, $expired ? 'offer_expired' : 'waitlist_left', 'withdrawn');
+                return;
+            }
+
+            abort_unless($interest->status === 'offered' && $interest->offer_expires_at->isFuture(), 409, 'This seat offer has expired or is unavailable.');
+            $this->assertEligible($activity, (int) $data['expected_activity_version'], $interest->child_age, $interest->trial_session);
+            $availability = $this->availability($activity, session: $interest->trial_session);
+            abort_unless($availability['count'] + $availability['held'] <= $availability['capacity'], 409, 'This session has no available capacity.');
+            $this->updateWaitlist($interest, $parent, $activity, 'offer_accepted', 'interested');
+        }, 5);
+    }
+
+    private function updateWaitlist(Interest $interest, User $actor, Activity $activity, string $action, string $status, ?CarbonImmutable $expires = null): void
+    {
+        $previous = $interest->status;
+        $interest->update(['status' => $status, 'version' => $interest->version + 1, 'activity_version' => $activity->version,
+            'offer_expires_at' => $expires ?? $interest->offer_expires_at, 'withdrawn_at' => $status === 'withdrawn' ? now() : null]);
+        $this->record($interest, $actor, $action, $previous, $activity);
     }
 
     public function transfer(User $parent, int $interestId, array $input): Interest

@@ -154,4 +154,79 @@ class TrialScheduleChangesTest extends TestCase
         $this->assertDatabaseCount('activity_events', 0);
         $this->assertDatabaseCount('notification_outbox', 2);
     }
+
+    public function test_fifo_offer_reserves_capacity_and_only_owner_can_accept(): void
+    {
+        $holder = $this->user();
+        $seat = $this->register($holder, 1);
+        $first = $this->user();
+        $second = $this->user();
+        $url = '/activities/'.$this->activity->id.'/interest';
+        $data = ['child_name' => 'Private waiting child', 'child_age' => 8, 'trial_session' => 1,
+            'expected_activity_version' => 2, 'interest_terms' => 1, 'waitlist' => 1];
+        $this->actingAs($first)->get('/activities/'.$this->activity->id)->assertOk()->assertSee('Join waitlist');
+        $this->post($url, $data)->assertRedirect('/parent');
+        $this->post($url, $data)->assertRedirect('/parent');
+        $this->actingAs($second)->post($url, $data)->assertRedirect('/parent');
+        $entry = Interest::where('parent_id', $first->id)->sole();
+        $this->actingAs($holder)->post('/parent/interests/'.$seat->id.'/withdraw', [
+            'expected_version' => 1, 'withdraw_confirm' => 1,
+        ])->assertRedirect();
+        $this->actingAs($this->user())->post($url, [...$data, 'waitlist' => null])->assertSessionHasErrors('waitlist');
+        $direct = $data;
+        unset($direct['waitlist']);
+        $this->post($url, $direct)->assertStatus(409);
+        $offer = '/provider/activities/'.$this->activity->id.'/offer';
+        $this->actingAs($this->user('provider'))->post($offer)->assertNotFound();
+        $this->actingAs($this->provider)->get('/provider/activities/'.$this->activity->id)->assertOk()->assertSee('Offer next seat');
+        $this->post($offer, $data)->assertRedirect();
+        $this->post($offer, $data)->assertStatus(409);
+        $this->assertSame('offered', $entry->fresh()->status);
+        $this->assertDatabaseHas('interests', ['parent_id' => $second->id, 'status' => 'waitlisted']);
+        $event = InterestEvent::where('action', 'offered')->sole();
+        $this->assertEqualsCanonicalizing([$first->id, $this->provider->id], OutboxMessage::where('interest_event_id', $event->id)->pluck('recipient_id')->all());
+        $this->assertStringNotContainsString('Private waiting child', OutboxMessage::where('kind', 'provider_offered')->sole()->message);
+        $response = '/parent/interests/'.$entry->id.'/waitlist';
+        $accept = ['decision' => 'accept', 'expected_version' => 2, 'expected_activity_version' => 3];
+        $this->actingAs($second)->post($response, $accept)->assertNotFound();
+        $this->actingAs($first)->get('/parent')->assertOk()->assertSee('Accept seat offer')->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $this->post($response, $accept)->assertRedirect('/parent');
+        $this->post($response, $accept)->assertStatus(409);
+        $this->assertSame('interested', $entry->fresh()->status);
+        $this->assertSame(1, app(ParentInterests::class)->activeInterests($this->activity, 1)->count());
+    }
+
+    public function test_expiry_releases_capacity_and_next_offer_audits_expiry_atomically(): void
+    {
+        $service = app(ParentInterests::class);
+        $holder = $this->user();
+        $seat = $this->register($holder, 1);
+        $first = $this->user();
+        $second = $this->user();
+        $input = ['child_name' => 'Waiting child', 'child_age' => 8, 'trial_session' => 1, 'expected_activity_version' => 2];
+        $entry = $service->register($first, $this->activity->id, $input, true);
+        $next = $service->register($second, $this->activity->id, $input, true);
+        $service->change($holder, $seat->id, 'withdraw', ['expected_version' => 1]);
+        $service->offerNext($this->provider, $this->activity->id, 1, 2);
+        $this->assertEquals(now()->addHours(24)->timestamp, $entry->fresh()->offer_expires_at->timestamp);
+        $this->travel(24)->hours();
+        $this->actingAs($first)->post('/parent/interests/'.$entry->id.'/waitlist', [
+            'decision' => 'accept', 'expected_version' => 2, 'expected_activity_version' => 3,
+        ])->assertStatus(409);
+        $this->assertSame(0, $service->availability($this->activity->fresh(), session: 1)['held']);
+        $url = '/provider/activities/'.$this->activity->id.'/offer';
+        $request = ['trial_session' => 1, 'expected_activity_version' => 3];
+        DB::statement("CREATE TRIGGER block_offer_notice BEFORE INSERT ON notification_outbox WHEN NEW.kind='parent_offered' BEGIN SELECT RAISE(ABORT,'outbox unavailable'); END");
+        $this->actingAs($this->provider)->post($url, $request)->assertStatus(500);
+        $this->assertSame(3, $this->activity->fresh()->version);
+        $this->assertSame('offered', $entry->fresh()->status);
+        $this->assertSame('waitlisted', $next->fresh()->status);
+        $this->assertDatabaseMissing('interest_events', ['action' => 'offer_expired']);
+        DB::statement('DROP TRIGGER block_offer_notice');
+        $this->post($url, $request)->assertRedirect();
+        $this->assertSame('withdrawn', $entry->fresh()->status);
+        $this->assertSame('offered', $next->fresh()->status);
+        $this->assertDatabaseHas('interest_events', ['action' => 'offer_expired', 'interest_id' => $entry->id]);
+        $this->assertSame([$first->id], OutboxMessage::where('kind', 'parent_offer_expired')->pluck('recipient_id')->all());
+    }
 }

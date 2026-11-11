@@ -10,6 +10,15 @@
     @include('provider.partials.prices')
     @include('provider.partials.trial-sessions')
     @if($errors->any())<p class="error" role="alert">{{ $errors->first() }}</p>@endif
+    @foreach($sessions as $number => $session)
+        @if($session['can_offer'] && $session['waiting'] > 0)
+            <form method="post" action="{{ route('provider.offer', $activity) }}">@csrf
+                <input type="hidden" name="expected_activity_version" value="{{ $activity->version }}">
+                <input type="hidden" name="trial_session" value="{{ $number }}">
+                <button type="submit">Offer next seat · {{ $session['start'] }} (Sydney)</button>
+            </form>
+        @endif
+    @endforeach
     @php($reschedulable = array_filter($sessions, fn ($session) => $session['status'] === 'pending_registrations' && \App\Services\TrialSchedule::startsAt($session['start'])->isFuture()))
     @if($reschedulable !== [])
     <form method="post" action="{{ route('provider.reschedule', $activity) }}">@csrf

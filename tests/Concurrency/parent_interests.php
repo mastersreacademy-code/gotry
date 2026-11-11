@@ -62,6 +62,10 @@ function executeJob(array $job): array
             return ['status'=>200,'id'=>$activity->id];
         }
         $service = new ParentInterests;
+        if ($job['action'] === 'offer') {
+            $service->offerNext($parent, $job['activity_id'], $job['trial_session'], 2);
+            return ['status' => 200];
+        }
         if ($job['action'] === 'transfer') {
             $interest = $service->transfer($parent, $job['interest_id'], [
                 'expected_version' => 1, 'expected_activity_version' => 2, 'trial_session' => $job['trial_session'],
@@ -186,6 +190,22 @@ $recipients = OutboxMessage::where('activity_event_id', $reschedule->id)->pluck(
 check(in_array($provider->id, $recipients) && count($recipients) === ($moved ? 2 : 1)
     && in_array($parents[0]->id, $recipients) === $moved, 'Reschedule did not notify the committed recipient set.');
 echo "PASS: reschedule versus transfer, stale forms rejected or moved parent notified\n";
+
+$activity = $transferFixture();
+$service = new ParentInterests;
+$input = ['child_name' => 'Race child', 'child_age' => 8, 'trial_session' => 1, 'expected_activity_version' => 2];
+$seat = $service->register($parents[0], $activity->id, $input);
+$first = $service->register($parents[1], $activity->id, $input, true);
+$second = $service->register($parents[2], $activity->id, $input, true);
+$service->change($parents[0], $seat->id, 'withdraw', ['expected_version' => 1]);
+$offer = ['action' => 'offer', 'parent_id' => $provider->id, 'activity_id' => $activity->id, 'trial_session' => 1];
+$results = parallel([$offer, $offer, [...$job($parents[3], $activity, 'New child'), 'trial_session' => 1]]);
+$statuses = array_column($results, 'status');
+sort($statuses);
+check($statuses === [200, 409, 409], 'Concurrent offers and registration did not reserve exactly one seat.');
+check($first->fresh()->status === 'offered' && $second->fresh()->status === 'waitlisted', 'Concurrent offers violated queue order.');
+check(OutboxMessage::where('activity_id', $activity->id)->where('kind', 'parent_offered')->count() === 1, 'Concurrent offers duplicated the parent notice.');
+echo "PASS: concurrent offers and registration reserve one seat for the first family\n";
 
 $activity = $fixture(2);
 $results = parallel(array_map(fn ($parent) => $job($parent, $activity, 'Child '.$parent->id), $parents));
