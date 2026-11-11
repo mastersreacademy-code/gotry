@@ -226,3 +226,76 @@
 @media (max-width: 700px) {
     .activity-page .discovery-detail, .activity-how .activity-steps { grid-template-columns: minmax(0, 1fr); }
 }
+
+.activity-page {
+    --ink: #0b206a;
+    --accent: #c40052;
+    max-width: 1086px;
+    margin-inline: auto;
+    padding: 0 clamp(.75rem, 2.5vw, 1.7rem) 1rem;
+    background: radial-gradient(ellipse at 50% 50%, #e4effd, #f6faff 75%, #fff);
+}
+.activity-page h2 {
+    font-size: clamp(1.45rem, 3vw, 2.15rem);
+    line-height: 1.12;
+    font-weight: 850;
+}
+.activity-page h2 small { font-size: .62em; white-space: nowrap; }
+.activity-masthead { padding: .35rem clamp(.25rem, 2vw, 1.4rem); }
+.activity-wordmark { padding-right: .9rem; line-height: 0; }
+.activity-wordmark img { width: clamp(4rem, 13vw, 9rem); height: auto; }
+.activity-organiser strong { font-size: clamp(1rem, 2.8vw, 1.75rem); line-height: 1.1; }
+.activity-organiser small { margin-top: .15rem; }
+.activity-page .activity-hero {
+    position: relative;
+    isolation: isolate;
+    min-height: clamp(20rem, 36vw, 25rem);
+    border-radius: 48% 16% 7% 6% / 10% 17% 5% 7%;
+    margin-inline: calc(-1 * clamp(.75rem, 2.5vw, 1.7rem));
+    background: linear-gradient(115deg, #005ac6, #008be2 65%, #00a7dc);
+}
+.activity-hero-photo .activity-hero-copy { z-index: 1; }
+.activity-hero-photo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, #0067d0 12%, #0079d7 40%, transparent 71%);
+    pointer-events: none;
+}
+.activity-page .activity-hero-photo img {
+    position: absolute;
+    inset: 0 0 0 auto;
+    width: 63%;
+    height: 100%;
+    min-height: 0;
+    object-position: center 43%;
+}
+.activity-page .activity-hero h1 { font-size: clamp(2.4rem, 5.25vw, 3.7rem); font-weight: 900; }
+.activity-page .activity-hero-copy { padding: 2rem clamp(1.5rem, 6vw, 4.8rem) 4rem; }
+.activity-page .activity-description { color: white; font-size: clamp(1rem, 2vw, 1.3rem); line-height: 1.3; margin-bottom: 0; }
+.activity-page .activity-category { transform: rotate(-2deg); font-weight: 850; }
+.activity-page .activity-overview { position: relative; z-index: 1; margin-top: -2rem; }
+.activity-page .panel { background-color: white; }
+.activity-page .activity-facts > div { padding: .65rem .8rem; }
+.activity-page .activity-prices { margin-top: 1rem; }
+.activity-page .activity-price { padding: 1rem; border-radius: 18px; }
+.activity-page .activity-price:nth-child(even) strong { color: #0b5b16; }
+.activity-page .activity-price strong { font-weight: 900; font-size: clamp(1.65rem, 4vw, 3rem); }
+.activity-page .activity-deadline { background: #ffedf5; align-items: center; }
+.activity-page .activity-deadline :is(h2, time) { color: #b50049; }
+.activity-page .activity-deadline time { font-size: clamp(1.15rem, 2.5vw, 1.65rem); }
+.activity-page .activity-final-action .button {
+    width: min(100%, 49rem);
+    background: linear-gradient(#df176d, #b90050);
+    font-size: clamp(1.1rem, 3.5vw, 2rem);
+    font-weight: 850;
+}
+.activity-page .activity-final-action .button:hover { background: #a90048; }
+.activity-page .activity-back { margin-top: 1rem; }
+@media (max-width: 700px) {
+    .activity-page .activity-hero { border-radius: 24px; min-height: 0; }
+    .activity-page .activity-hero-copy { padding: 1.4rem; }
+    .activity-page .activity-hero-photo img { position: static; width: 100%; height: auto; }
+    .activity-hero-photo::after { content: none; }
+    .activity-page .activity-overview { margin-top: -.65rem; }
+}
