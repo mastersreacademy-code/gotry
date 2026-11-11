@@ -100,6 +100,40 @@ class TrialScheduleChangesTest extends TestCase
         $this->assertDatabaseCount('interests', 1);
     }
 
+    public function test_stale_dashboard_forms_return_to_the_activity_without_mutation(): void
+    {
+        $parent = $this->user();
+        $entry = $this->register($parent, 1);
+        $path = '/parent/interests/'.$entry->id;
+        $dashboard = '/parent?activity='.$this->activity->id;
+        $input = ['expected_version' => 1, 'expected_activity_version' => 1, 'return_to_dashboard' => 1];
+
+        $this->actingAs($parent)->post($path.'/transfer', [...$input, 'trial_session' => 2, 'transfer_confirm' => 1])
+            ->assertRedirect($dashboard)->assertSessionHasErrors('registration');
+        $this->get($dashboard)->assertOk()->assertSee('Activity details changed');
+        $this->assertSame(1, $entry->fresh()->trial_session);
+        app(ParentInterests::class)->change($parent, $entry->id, 'withdraw', ['expected_version' => 1]);
+        $this->post($path.'/restore', [...$input, 'expected_version' => 2, 'interest_terms' => 1])
+            ->assertRedirect($dashboard)->assertSessionHasErrors('registration');
+        $this->assertSame('withdrawn', $entry->fresh()->status);
+
+        $holder = $this->user();
+        $seat = $this->register($holder, 2);
+        $offer = app(ParentInterests::class)->register($parent, $this->activity->id, [
+            'child_name' => 'Waitlisted child', 'child_age' => 8, 'trial_session' => 2, 'expected_activity_version' => 2,
+        ], true);
+        app(ParentInterests::class)->change($holder, $seat->id, 'withdraw', ['expected_version' => 1]);
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+        $this->travel(24)->hours();
+        $this->post('/parent/interests/'.$offer->id.'/waitlist', [
+            ...$input, 'decision' => 'accept', 'expected_version' => 2, 'expected_activity_version' => 3,
+        ])->assertRedirect($dashboard)->assertSessionHasErrors('registration');
+        $this->get($dashboard)->assertOk()->assertSee('This seat offer has expired or is unavailable.')
+            ->assertDontSee('Accept seat offer')->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $this->assertSame('offered', $offer->fresh()->status);
+        $this->assertDatabaseMissing('interest_events', ['interest_id' => $offer->id, 'action' => 'offer_accepted']);
+    }
+
     public function test_transfer_checks_ownership_capacity_and_versions_and_keeps_a_single_interest(): void
     {
         $parent = $this->user();

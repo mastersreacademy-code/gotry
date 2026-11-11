@@ -62,16 +62,20 @@ class ParentInterestController
             'expected_version' => ['required', 'integer', 'min:1'],
             'expected_activity_version' => ['required', 'integer', 'min:1'],
         ]);
-        $service->respondToWaitlist($request->user(), $interest->id, $data);
-        return redirect()->route('parent.dashboard')->with('status', $data['decision'] === 'accept' ? 'Seat offer accepted.' : 'Waitlist entry closed.');
+        return $this->dashboardAction($request, $interest,
+            fn () => $service->respondToWaitlist($request->user(), $interest->id, $data),
+            $data['decision'] === 'accept' ? 'Seat offer accepted.' : 'Waitlist entry closed.',
+        );
     }
 
     public function transfer(Request $request, Interest $interest, ParentInterests $service)
     {
         abort_unless($interest->parent_id === $request->user()->id, 404);
         $request->validate(['transfer_confirm' => ['accepted']]);
-        $service->transfer($request->user(), $interest->id, $request->all());
-        return redirect()->route('parent.dashboard')->with('status', 'Interest moved to the selected session.');
+        return $this->dashboardAction($request, $interest,
+            fn () => $service->transfer($request->user(), $interest->id, $request->all()),
+            'Interest moved to the selected session.',
+        );
     }
 
     public function withdraw(Request $request, Interest $interest, ParentInterests $service)
@@ -87,7 +91,25 @@ class ParentInterestController
     {
         abort_unless($interest->parent_id === $request->user()->id, 404);
         $request->validate(['interest_terms' => ['accepted']]);
-        $service->change($request->user(), $interest->id, 'restore', $request->all());
-        return redirect()->route('parent.dashboard')->with('status', 'Interest restored. This is not a confirmed booking or payment request.');
+        return $this->dashboardAction($request, $interest,
+            fn () => $service->change($request->user(), $interest->id, 'restore', $request->all()),
+            'Interest restored. This is not a confirmed booking or payment request.',
+        );
+    }
+
+    private function dashboardAction(Request $request, Interest $interest, callable $action, string $message)
+    {
+        try {
+            $action();
+        } catch (HttpExceptionInterface $error) {
+            if ($error->getStatusCode() !== 409 || ! $request->boolean('return_to_dashboard') || $request->expectsJson()) {
+                throw $error;
+            }
+
+            return redirect()->route('parent.dashboard', ['activity' => $interest->activity_id])
+                ->withErrors(['registration' => $error->getMessage()]);
+        }
+
+        return redirect()->route('parent.dashboard')->with('status', $message);
     }
 }

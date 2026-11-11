@@ -64,6 +64,7 @@
             </form>
             @if($sessionStart && $destinations !== [] && \App\Services\TrialSchedule::startsAt($sessionStart)->isFuture())
             <form method="post" action="{{ route('parent.transfer', $interest) }}">@csrf
+                <input type="hidden" name="return_to_dashboard" value="1">
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">
                 <input type="hidden" name="expected_activity_version" value="{{ $activity->version }}">
                 <label for="transfer-{{ $interest->id }}">Move to another trial session (Sydney time)</label>
@@ -80,6 +81,7 @@
             </details>
         @elseif(in_array($interest->status, ['waitlisted', 'offered'], true))
             <form method="post" action="{{ route('parent.waitlist', $interest) }}">@csrf
+                <input type="hidden" name="return_to_dashboard" value="1">
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">
                 <input type="hidden" name="expected_activity_version" value="{{ $activity->version }}">
                 @if($canAccept)
@@ -90,6 +92,7 @@
             </form>
         @elseif($slot['open'])
             <form method="post" action="{{ route('parent.restore', $interest) }}">@csrf
+                <input type="hidden" name="return_to_dashboard" value="1">
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">
                 <input type="hidden" name="expected_activity_version" value="{{ $activity->version }}">
                 <label class="check-row"><input type="checkbox" name="interest_terms" value="1" required> I have reviewed the current activity details and want to restore this interest.</label>
