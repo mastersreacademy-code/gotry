@@ -42,3 +42,27 @@ Artisan::command('gotry:create-admin', function (): int {
     $this->info('Admin account created. Sign in at /account.');
     return Command::SUCCESS;
 })->purpose('Create a new admin interactively, without a default password or changing existing accounts');
+
+Artisan::command('gotry:process-waitlists', function (\App\Services\ParentInterests $service): int {
+    $candidates = \App\Models\Interest::query()->whereNotNull('trial_session')->where(function ($query): void {
+        $query->where(fn ($offers) => $offers->where('status', 'offered')->where('offer_expires_at', '<=', now()))
+            ->orWhere(fn ($queue) => $queue->where('status', 'waitlisted')->whereIn('activity_id',
+                \App\Models\Activity::where('status', 'pending_registrations')->select('id')));
+    })->select('activity_id');
+    $failed = false;
+    \App\Models\Activity::whereIn('id', $candidates)->select('id')->chunkById(100, function ($activities) use ($service, &$failed): void {
+        foreach ($activities as $activity) {
+            try {
+                $service->processWaitlist($activity->id);
+            } catch (\Exception $error) {
+                report($error);
+                $this->error('Waitlist processing failed for activity '.$activity->id.'.');
+                $failed = true;
+            }
+        }
+    });
+
+    return $failed ? Command::FAILURE : Command::SUCCESS;
+})->purpose('Expire trial seat offers and fill unreserved seats from eligible waitlists');
+
+\Illuminate\Support\Facades\Schedule::command('gotry:process-waitlists')->everyMinute();

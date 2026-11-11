@@ -229,4 +229,63 @@ class TrialScheduleChangesTest extends TestCase
         $this->assertDatabaseHas('interest_events', ['action' => 'offer_expired', 'interest_id' => $entry->id]);
         $this->assertSame([$first->id], OutboxMessage::where('kind', 'parent_offer_expired')->pluck('recipient_id')->all());
     }
+
+    public function test_scheduled_processing_expires_and_offers_once_with_scoped_notices(): void
+    {
+        $service = app(ParentInterests::class);
+        $holder = $this->user();
+        $seat = $this->register($holder, 1);
+        $first = $this->user();
+        $second = $this->user();
+        $input = ['child_name' => 'Private waiting child', 'child_age' => 8, 'trial_session' => 1, 'expected_activity_version' => 2];
+        $entry = $service->register($first, $this->activity->id, $input, true);
+        $next = $service->register($second, $this->activity->id, $input, true);
+        $service->change($holder, $seat->id, 'withdraw', ['expected_version' => 1]);
+
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+        $this->assertSame('offered', $entry->fresh()->status);
+        $this->assertSame('waitlisted', $next->fresh()->status);
+        $this->assertSame(3, $this->activity->fresh()->version);
+
+        $this->travel(24)->hours();
+        DB::statement("CREATE TRIGGER block_automatic_offer BEFORE INSERT ON notification_outbox WHEN NEW.kind='parent_offered' BEGIN SELECT RAISE(ABORT,'outbox unavailable'); END");
+        $this->artisan('gotry:process-waitlists')->assertFailed();
+        $this->assertSame('offered', $entry->fresh()->status);
+        $this->assertSame('waitlisted', $next->fresh()->status);
+        $this->assertSame(3, $this->activity->fresh()->version);
+        $this->assertDatabaseMissing('interest_events', ['action' => 'offer_expired']);
+        DB::statement('DROP TRIGGER block_automatic_offer');
+
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+        $this->assertSame('withdrawn', $entry->fresh()->status);
+        $this->assertSame('offered', $next->fresh()->status);
+        $this->assertSame(4, $this->activity->fresh()->version);
+        $this->assertSame(1, $service->seatHolds($this->activity, 1)->count());
+        $this->assertSame(3, InterestEvent::whereNull('actor_id')->count());
+        $this->assertSame([$first->id], OutboxMessage::where('kind', 'parent_offer_expired')->pluck('recipient_id')->all());
+        $this->assertEqualsCanonicalizing([$first->id, $second->id], OutboxMessage::where('kind', 'parent_offered')->pluck('recipient_id')->all());
+        $this->assertDatabaseMissing('notification_outbox', ['kind' => 'parent_offered', 'recipient_id' => $holder->id]);
+        $this->assertStringNotContainsString('Private waiting child', OutboxMessage::where('kind', 'provider_offer_expired')->sole()->message);
+        $this->actingAs($this->user('admin'))->get('/admin/audit?type=interest')->assertOk()->assertSee('GoTry automation');
+    }
+
+    public function test_processing_expires_existing_offers_without_refilling_closed_sessions(): void
+    {
+        $service = app(ParentInterests::class);
+        $holder = $this->user();
+        $seat = $this->register($holder, 1);
+        $input = ['child_name' => 'Waiting child', 'child_age' => 8, 'trial_session' => 1, 'expected_activity_version' => 2];
+        $entry = $service->register($this->user(), $this->activity->id, $input, true);
+        $next = $service->register($this->user(), $this->activity->id, $input, true);
+        $service->change($holder, $seat->id, 'withdraw', ['expected_version' => 1]);
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+        $this->activity->update(['status' => 'cancelled_by_admin']);
+        $this->travel(24)->hours();
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+        $this->assertSame('withdrawn', $entry->fresh()->status);
+        $this->assertSame('waitlisted', $next->fresh()->status);
+        $this->assertSame(1, OutboxMessage::where('kind', 'parent_offered')->count());
+    }
 }

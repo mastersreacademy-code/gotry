@@ -62,6 +62,10 @@ function executeJob(array $job): array
             return ['status'=>200,'id'=>$activity->id];
         }
         $service = new ParentInterests;
+        if ($job['action'] === 'process_waitlist') {
+            $service->processWaitlist($job['activity_id']);
+            return ['status' => 200];
+        }
         if ($job['action'] === 'offer') {
             $service->offerNext($parent, $job['activity_id'], $job['trial_session'], 2);
             return ['status' => 200];
@@ -206,6 +210,18 @@ check($statuses === [200, 409, 409], 'Concurrent offers and registration did not
 check($first->fresh()->status === 'offered' && $second->fresh()->status === 'waitlisted', 'Concurrent offers violated queue order.');
 check(OutboxMessage::where('activity_id', $activity->id)->where('kind', 'parent_offered')->count() === 1, 'Concurrent offers duplicated the parent notice.');
 echo "PASS: concurrent offers and registration reserve one seat for the first family\n";
+
+$activity = $transferFixture();
+$seat = $service->register($parents[0], $activity->id, $input);
+$first = $service->register($parents[1], $activity->id, $input, true);
+$second = $service->register($parents[2], $activity->id, $input, true);
+$service->change($parents[0], $seat->id, 'withdraw', ['expected_version' => 1]);
+$worker = [...$offer, 'action' => 'process_waitlist', 'activity_id' => $activity->id];
+parallel([$worker, $worker, [...$offer, 'activity_id' => $activity->id]]);
+check($first->fresh()->status === 'offered' && $second->fresh()->status === 'waitlisted', 'Parallel processors violated FIFO or capacity.');
+check(OutboxMessage::where('activity_id', $activity->id)->where('kind', 'parent_offered')->count() === 1, 'Parallel processors duplicated offers.');
+check($activity->fresh()->version === 3, 'A retry changed the activity version.');
+echo "PASS: overlapping waitlist processors and a manual offer issue exactly one seat offer\n";
 
 $activity = $fixture(2);
 $results = parallel(array_map(fn ($parent) => $job($parent, $activity, 'Child '.$parent->id), $parents));

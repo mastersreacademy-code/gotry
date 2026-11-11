@@ -137,9 +137,9 @@ class ParentInterests
         abort_unless($availability['open'], 409, $availability['reason'] ?? 'Trial unavailable.');
     }
 
-    private function record(Interest $interest, User $actor, string $action, ?string $from, Activity $activity, ?array $scheduleChange = null): void
+    private function record(Interest $interest, ?User $actor, string $action, ?string $from, Activity $activity, ?array $scheduleChange = null): void
     {
-        $event = InterestEvent::create(['interest_id' => $interest->id, 'actor_id' => $actor->id, 'action' => $action,
+        $event = InterestEvent::create(['interest_id' => $interest->id, 'actor_id' => $actor?->id, 'action' => $action,
             'from_status' => $from, 'to_status' => $interest->status, 'version' => $interest->version, 'schedule_change' => $scheduleChange, 'offer_expires_at' => $interest->offer_expires_at]);
         app(NotificationOutbox::class)->interest($event, $interest, $activity);
     }
@@ -188,17 +188,53 @@ class ParentInterests
             abort_unless($capacity['remaining'] > 0, 409, 'There are no unreserved seats.');
             $next = $this->eligibleWaitlist($activity, $session)->oldest('id')->lockForUpdate()->first();
             abort_if($next === null, 409, 'There are no eligible families waiting for this session.');
-            $expires = min(CarbonImmutable::now()->addHours(24),
-                TrialSchedule::startsAt(TrialSchedule::sessions($activity)[$session]),
-                CarbonImmutable::parse($activity->details['deadline'], 'Australia/Sydney')->addDay()->startOfDay(),
-            );
             // A duplicate provider form must not offer the next seat.
             $activity->increment('version');
-            $expired = $this->sessionInterests($activity, $session)->where('status', 'offered')
-                ->where('offer_expires_at', '<=', now())->lockForUpdate()->get();
-            foreach ($expired as $entry) $this->updateWaitlist($entry, $provider, $activity, 'offer_expired', 'withdrawn');
-            $this->updateWaitlist($next, $provider, $activity, 'offered', 'offered', $expires->setTimezone(config('app.timezone')));
+            $this->expireOffers($activity, $session, $provider);
+            $this->offerSeat($activity, $next, $provider);
         }, 5);
+    }
+
+    public function processWaitlist(int $activityId): void
+    {
+        DB::transaction(function () use ($activityId): void {
+            $activity = $this->lockActivity($activityId);
+            $versionBumped = false;
+
+            foreach (array_keys(TrialSchedule::sessions($activity)) as $session) {
+                $this->expireOffers($activity, $session, null);
+                if ($this->closedReason($activity, $session) !== null) continue;
+
+                $remaining = $this->availability($activity, session: $session)['remaining'];
+                if ($remaining <= 0) continue;
+
+                $entries = $this->eligibleWaitlist($activity, $session)->oldest('id')
+                    ->limit($remaining)->lockForUpdate()->get();
+                if ($entries->isEmpty()) continue;
+
+                if (! $versionBumped) {
+                    $activity->increment('version');
+                    $versionBumped = true;
+                }
+                foreach ($entries as $entry) $this->offerSeat($activity, $entry, null);
+            }
+        }, 5);
+    }
+
+    private function expireOffers(Activity $activity, int $session, ?User $actor): void
+    {
+        $expired = $this->sessionInterests($activity, $session)->where('status', 'offered')
+            ->where('offer_expires_at', '<=', now())->lockForUpdate()->get();
+        foreach ($expired as $entry) $this->updateWaitlist($entry, $actor, $activity, 'offer_expired', 'withdrawn');
+    }
+
+    private function offerSeat(Activity $activity, Interest $entry, ?User $actor): void
+    {
+        $expires = min(CarbonImmutable::now()->addHours(24),
+            TrialSchedule::startsAt(TrialSchedule::sessions($activity)[$entry->trial_session]),
+            CarbonImmutable::parse($activity->details['deadline'], 'Australia/Sydney')->addDay()->startOfDay(),
+        );
+        $this->updateWaitlist($entry, $actor, $activity, 'offered', 'offered', $expires->setTimezone(config('app.timezone')));
     }
 
     public function respondToWaitlist(User $parent, int $interestId, array $data): void
@@ -224,7 +260,7 @@ class ParentInterests
         }, 5);
     }
 
-    private function updateWaitlist(Interest $interest, User $actor, Activity $activity, string $action, string $status, ?CarbonImmutable $expires = null): void
+    private function updateWaitlist(Interest $interest, ?User $actor, Activity $activity, string $action, string $status, ?CarbonImmutable $expires = null): void
     {
         $previous = $interest->status;
         $interest->update(['status' => $status, 'version' => $interest->version + 1, 'activity_version' => $activity->version,

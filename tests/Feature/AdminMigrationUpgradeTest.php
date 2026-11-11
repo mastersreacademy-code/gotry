@@ -9,7 +9,7 @@ class AdminMigrationUpgradeTest extends TestCase
     use DatabaseMigrations;
     public function test_access_migration_preserves_existing_admin_provider_and_parent_accounts(): void
     {
-        $this->artisan('migrate:rollback',['--step'=>4,'--force'=>true])->assertExitCode(0);
+        $this->artisan('migrate:rollback',['--step'=>5,'--force'=>true])->assertExitCode(0);
         foreach(['admin','provider','parent'] as $role) DB::table('users')->insert(['name'=>'Existing '.$role,'email'=>$role.'@example.test','role'=>$role,'password'=>'existing-password-hash-'.$role,'created_at'=>now(),'updated_at'=>now()]);
         $this->artisan('migrate',['--force'=>true])->assertExitCode(0);
         foreach(DB::table('users')->get() as $user) {
@@ -21,7 +21,7 @@ class AdminMigrationUpgradeTest extends TestCase
 
     public function test_trial_session_migration_preserves_existing_accounts_and_single_trial_history(): void
     {
-        $this->artisan('migrate:rollback', ['--step' => 3, '--force' => true])->assertExitCode(0);
+        $this->artisan('migrate:rollback', ['--step' => 4, '--force' => true])->assertExitCode(0);
         $user = fn ($role) => DB::table('users')->insertGetId([
             'name' => $role, 'email' => $role.'@example.test', 'role' => $role,
             'password' => 'existing-hash-'.$role, 'is_active' => $role !== 'admin', 'access_version' => 2,
