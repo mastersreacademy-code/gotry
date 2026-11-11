@@ -60,3 +60,16 @@
     .discovery-hero, .discovery-detail { grid-template-columns: minmax(0, 1fr); }
     .discovery-trial :is(button, .button) { width: 100%; text-align: center; }
 }
+
+.discovery-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto auto;
+    align-items: end;
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+.discovery-filters label { margin-top: 0; }
+@media (max-width: 700px) {
+    .discovery-filters { grid-template-columns: minmax(0, 1fr); }
+    .discovery-filters .button { text-align: center; }
+}

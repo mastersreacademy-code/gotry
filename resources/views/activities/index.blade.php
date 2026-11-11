@@ -9,6 +9,26 @@
         <h1>Explore trial activities</h1>
         <p>Find a free introductory trial that suits your child.</p>
     </div>
+    @if($errors->any())<p class="error" role="alert">{{ $errors->first() }}</p>@endif
+    <form class="discovery-filters panel" method="get" action="{{ route('activities.index') }}">
+        <div>
+            <label for="activity-search">Activity name</label>
+            <input id="activity-search" type="search" name="q" value="{{ $filters['q'] ?? '' }}" maxlength="100">
+        </div>
+        <div>
+            <label for="activity-category">Category</label>
+            <select id="activity-category" name="category">
+                <option value="">All categories</option>
+                @foreach($categories as $category)
+                    <option value="{{ $category }}" @selected(($filters['category'] ?? '') === $category)>{{ $category }}</option>
+                @endforeach
+            </select>
+        </div>
+        <button type="submit">Find activities</button>
+        @if(!empty($filters['q']) || !empty($filters['category']))
+            <a class="button secondary" href="{{ route('activities.index') }}">Clear filters</a>
+        @endif
+    </form>
     <div class="discovery-grid">
         @forelse($activities as $activity)
             @php
@@ -27,7 +47,7 @@
                 @if($open && $waiting)<span class="discovery-badge discovery-badge-wait">Waitlist also open</span>@endif
             </article>
         @empty
-            <article class="discovery-card discovery-empty"><h2>New activities are coming soon.</h2></article>
+            <article class="discovery-card discovery-empty"><h2>{{ !empty($filters['q']) || !empty($filters['category']) ? 'No activities match these filters.' : 'New activities are coming soon.' }}</h2></article>
         @endforelse
     </div>
     {{ $activities->links() }}

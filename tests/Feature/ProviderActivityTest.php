@@ -239,5 +239,12 @@ class ProviderActivityTest extends TestCase
         $this->actingAs($this->user())->get('/provider')->assertOk()->assertDontSee('Private listing');
         Activity::whereKey(1)->update(['status' => 'pending_registrations', 'title' => 'Approved public listing']);
         $this->get('/activities')->assertOk()->assertSee('Approved public listing')->assertDontSee('Private listing');
+        auth()->logout();
+        $this->get('/activities?q=Approved&category=Music')->assertOk()->assertSee('Approved public listing')
+            ->assertDontSee('Private listing')->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $this->get('/activities?q=Private&category=Music')->assertOk()->assertSee('No activities match these filters.')
+            ->assertDontSee('Private listing');
+        $this->get('/activities?category=Dance')->assertOk()->assertDontSee('Approved public listing');
+
     }
 }

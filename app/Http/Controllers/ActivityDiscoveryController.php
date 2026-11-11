@@ -4,18 +4,27 @@ namespace App\Http\Controllers;
 
 use App\Models\Activity;
 use App\Services\ProgrammePricing;
+use App\Services\ActivityDraft;
 use App\Services\ParentInterests;
 use App\Services\TrialSchedule;
 use App\Models\Interest;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class ActivityDiscoveryController
 {
-    public function index(ParentInterests $interests)
+    public function index(Request $request, ParentInterests $interests)
     {
+        $categories = ActivityDraft::CATEGORIES;
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', Rule::in($categories)],
+        ]);
         $activities = Activity::where('status', 'pending_registrations')
             ->whereHas('provider', fn ($query) => $query->where('is_active', true))
-            ->latest('id')->paginate(20);
+            ->when($filters['q'] ?? null, fn ($query, $term) => $query->where('title', 'like', '%'.$term.'%'))
+            ->when($filters['category'] ?? null, fn ($query, $category) => $query->where('category', $category))
+            ->latest('id')->paginate(20)->appends($filters);
         $availability = [];
         foreach ($activities as $activity) {
             $availability[$activity->id] = [];
@@ -24,7 +33,7 @@ class ActivityDiscoveryController
             }
         }
 
-        return view('activities.index', compact('activities', 'availability'));
+        return view('activities.index', compact('activities', 'availability', 'categories', 'filters'));
     }
 
     public function show(Request $request, Activity $activity, ProgrammePricing $pricing, ParentInterests $interests)
