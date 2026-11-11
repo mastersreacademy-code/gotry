@@ -188,6 +188,21 @@ class TrialScheduleChangesTest extends TestCase
         $this->assertDatabaseMissing('notification_outbox', ['kind' => 'parent_trial_review', 'recipient_id' => $parent->id]);
     }
 
+    public function test_stale_provider_forms_return_to_trial_management_without_changes(): void
+    {
+        $path = '/provider/activities/'.$this->activity->id;
+        $input = ['trial_session' => 1, 'expected_activity_version' => 1, 'return_to_listing' => 1];
+        $this->actingAs($this->provider)->post($path.'/reschedule', [
+            ...$input, 'trial_date' => '2026-12-13', 'trial_time' => '15:30', 'reschedule_confirm' => 1,
+        ])->assertRedirect($path.'#trial-management')->assertSessionHasErrors('listing');
+        $this->get($path)->assertOk()->assertSee('Activity changed or is closed')->assertSee('2026-12-10 09:00');
+        $this->post($path.'/offer', $input)->assertRedirect($path.'#trial-management')->assertSessionHasErrors('listing');
+        $this->postJson($path.'/offer', $input)->assertStatus(409);
+        $this->assertSame(2, $this->activity->fresh()->version);
+        $this->assertDatabaseCount('activity_events', 0);
+        $this->assertDatabaseCount('notification_outbox', 0);
+    }
+
     public function test_provider_reschedule_is_versioned_and_notifies_only_active_families_in_the_session(): void
     {
         $parent = $this->user();

@@ -27,6 +27,8 @@
     @foreach($sessions as $number => $session)
         @if($session['can_offer'] && $session['waiting'] > 0)
             <form method="post" action="{{ route('provider.offer', $activity) }}">@csrf
+                <input type="hidden" name="return_to_listing" value="1">
+
                 <input type="hidden" name="expected_activity_version" value="{{ $activity->version }}">
                 <input type="hidden" name="trial_session" value="{{ $number }}">
                 <button type="submit">Offer next seat · {{ $session['start'] }} (Sydney)</button>
@@ -36,6 +38,8 @@
     @php($reschedulable = array_filter($sessions, fn ($session) => $session['status'] === 'pending_registrations' && \App\Services\TrialSchedule::startsAt($session['start'])->isFuture()))
     @if($reschedulable !== [])
     <form method="post" action="{{ route('provider.reschedule', $activity) }}">@csrf
+        <input type="hidden" name="return_to_listing" value="1">
+
         <h2>Reschedule a trial session</h2>
         <p>Existing interest stays with the session. Registered parents receive an in-app notice. The registration deadline stays the same.</p>
         <input type="hidden" name="expected_activity_version" value="{{ $activity->version }}">

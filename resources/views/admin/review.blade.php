@@ -14,6 +14,8 @@
     <p>Provider declarations accepted: {{ $activity->details['declarations']['accepted_at'] ?? 'Not recorded' }}</p>
     @if($activity->status === 'pending_approval')
     <form method="post" action="{{ route('admin.decision', $activity) }}">@csrf
+        <input type="hidden" name="return_to_listing" value="1">
+
         <input type="hidden" name="expected_version" value="{{ $activity->version }}">
         <label for="reason">Reason (required for rejection)</label><textarea id="reason" name="reason" maxlength="1000">{{ old('reason') }}</textarea>
         <div class="actions"><button type="submit" name="action" value="approve">Approve listing</button><button class="secondary" type="submit" name="action" value="reject">Reject listing</button></div>
@@ -21,7 +23,9 @@
     @else<p>{{ $activity->review_reason }}</p>@endif
     @if(in_array($activity->status,['pending_registrations','proceeding_pending_payments'],true))
     <h2>Trial status controls</h2><p>Proceeding is not proof of payment. No parent is charged by these actions.</p>
-    <form method="post" action="{{ route('admin.lifecycle',$activity) }}">@csrf<input type="hidden" name="expected_version" value="{{ $activity->version }}">
+    <form method="post" action="{{ route('admin.lifecycle',$activity) }}">@csrf
+        <input type="hidden" name="return_to_listing" value="1">
+        <input type="hidden" name="expected_version" value="{{ $activity->version }}">
         @if($sessions !== [])
         <label for="trial_session">Trial session</label>
         <select id="trial_session" name="trial_session">
