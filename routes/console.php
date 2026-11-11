@@ -66,3 +66,77 @@ Artisan::command('gotry:process-waitlists', function (\App\Services\ParentIntere
 })->purpose('Expire trial seat offers and fill unreserved seats from eligible waitlists');
 
 \Illuminate\Support\Facades\Schedule::command('gotry:process-waitlists')->everyMinute();
+
+Artisan::command('gotry:seed-demo-activities {provider : Email of an existing active provider}', function (\App\Services\ActivityDraft $draft): int {
+    $provider = User::where('email', mb_strtolower(trim($this->argument('provider'))))
+        ->where('role', 'provider')->where('is_active', true)->first();
+
+    if ($provider === null) {
+        $this->error('Use the email of an existing active provider.');
+        return Command::FAILURE;
+    }
+
+    $today = \Carbon\CarbonImmutable::today('Australia/Sydney');
+    $firstDate = $today->next('Saturday')->addWeek();
+    $deadline = $firstDate->subDays(2)->toDateString();
+    $defaults = [
+        'business_name' => 'GoTry Demo Activities', 'contact_name' => 'Demo Contact',
+        'contact_email' => 'activities@example.test', 'phone' => '0200000000',
+        'min_age' => 6, 'max_age' => 12, 'trial_duration' => 45, 'deadline' => $deadline,
+        'trial_type' => 'group', 'trial_date' => $firstDate->toDateString(), 'trial_time' => '09:00',
+        'trial_min' => 2, 'trial_max' => 6,
+        'regular_format' => 'group', 'multiple_days' => '0', 'regular_day' => 'Saturday',
+        'regular_time' => '09:00', 'regular_min' => 3, 'regular_standard' => 5, 'regular_max' => 8,
+        'standard_price' => '24', 'small_group_price' => '30', 'lessons_per_term' => 8, 'discount_type' => 'none',
+    ];
+    $examples = [
+        'soccer' => [
+            'activity_name' => 'Demo: Junior Soccer Skills', 'category' => 'Sports & Fitness',
+            'description' => 'Practise dribbling, passing and teamwork through small-sided games.',
+            'venue' => 'North Sydney (demo venue)', 'bring' => 'Water bottle and sports shoes',
+            'extra_trial_times' => $firstDate->addDay()->format('Y-m-d').' 10:00',
+        ],
+        'piano' => [
+            'activity_name' => 'Demo: First Piano Lesson', 'category' => 'Music',
+            'description' => 'Explore the keyboard, find a steady beat and play a short tune.',
+            'venue' => 'Chatswood (demo venue)', 'trial_type' => 'individual',
+            'trial_availability' => 'Ask the provider for an after-school time.',
+            'regular_format' => 'individual', 'usual_availability' => 'Weekdays after school', 'individual_price' => '45',
+        ],
+        'art' => [
+            'activity_name' => 'Demo: Watercolour Studio', 'category' => 'Arts & Crafts',
+            'description' => 'Mix colours and paint a small landscape using wet-on-wet techniques.',
+            'venue' => 'Parramatta (demo venue)', 'min_age' => 8, 'trial_time' => '11:00',
+            'bring' => 'An apron or old shirt',
+        ],
+    ];
+
+    $results = DB::transaction(function () use ($provider, $draft, $defaults, $examples): array {
+        $results = [];
+        foreach ($examples as $key => $example) {
+            $input = array_replace($defaults, $example);
+            $details = [];
+            for ($step = 1; $step <= 4; $step++) {
+                $details = array_replace($details, $draft->validate($step, $input));
+            }
+            $token = \Ramsey\Uuid\Uuid::uuid5(\Ramsey\Uuid\Uuid::NAMESPACE_URL, 'gotry:demo:'.$provider->id.':'.$key)->toString();
+            $activity = \App\Models\Activity::firstOrCreate(
+                ['submission_token' => $token, 'provider_id' => $provider->id],
+                ['title' => $input['activity_name'], 'category' => $input['category'], 'status' => 'pending_approval',
+                    'details' => $details, 'submitted_at' => now()],
+            );
+            if ($activity->wasRecentlyCreated) {
+                \App\Models\ActivityEvent::create([
+                    'activity_id' => $activity->id, 'actor_id' => $provider->id, 'action' => 'demo_seeded',
+                    'to_status' => 'pending_approval', 'reason' => 'Demo data created by the GoTry console for this provider.',
+                ]);
+            }
+            $results[] = [$activity->id, $activity->title, $activity->statusLabel(), $activity->wasRecentlyCreated ? 'Created' : 'Already exists'];
+        }
+
+        return $results;
+    }, 5);
+
+    $this->table(['ID', 'Activity', 'Status', 'Result'], $results);
+    return Command::SUCCESS;
+})->purpose('Create three sample activities for an existing provider');
