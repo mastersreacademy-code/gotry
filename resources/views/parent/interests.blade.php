@@ -44,6 +44,9 @@
         } }}</span>
         <h3>@if($activity->status === 'pending_registrations')<a href="{{ route('activities.show', $activity) }}">{{ $activity->title }}</a>@else{{ $activity->title }}@endif</h3>
         <p>{{ $interest->child_name }} · Age {{ $interest->child_age }}</p>
+        @if($sessionStatus === 'pending_registrations' && !$activity->provider?->is_active)
+            <p class="notice">The provider is currently unavailable. New registrations and seat-offer acceptance are paused.</p>
+        @endif
 
         @if($sessionStart)
             <p>{{ $sessionStart }} (Sydney) · {{ \App\Models\Activity::STATUSES[$sessionStatus] }}</p>

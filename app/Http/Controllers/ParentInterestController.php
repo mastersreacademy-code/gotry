@@ -12,7 +12,7 @@ class ParentInterestController
 {
     public function index(Request $request, ParentInterests $service)
     {
-        $interests = Interest::where('parent_id', $request->user()->id)->with(['activity', 'latestEvent'])
+        $interests = Interest::where('parent_id', $request->user()->id)->with(['activity.provider', 'latestEvent'])
             ->orderByRaw("CASE WHEN status = 'offered' AND offer_expires_at > ? THEN 0 WHEN status IN ('interested', 'waitlisted') THEN 1 ELSE 2 END", [now()])
             ->orderByRaw("CASE WHEN status = 'offered' AND offer_expires_at > ? THEN offer_expires_at END", [now()])
             ->latest('id')->paginate(20);

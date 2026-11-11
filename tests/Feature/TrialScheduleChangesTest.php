@@ -374,6 +374,55 @@ class TrialScheduleChangesTest extends TestCase
             ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
     }
 
+    public function test_provider_suspension_pauses_registration_and_waitlist_promotion_until_reactivated(): void
+    {
+        $service = app(ParentInterests::class);
+        $holder = $this->user();
+        $first = $this->user();
+        $second = $this->user();
+        $admin = $this->user('admin');
+        $seat = $this->register($holder, 1);
+        $input = ['child_name' => 'Waiting child', 'child_age' => 8, 'trial_session' => 1, 'expected_activity_version' => 2];
+        $offer = $service->register($first, $this->activity->id, $input, true);
+        $next = $service->register($second, $this->activity->id, $input, true);
+        $service->change($holder, $seat->id, 'withdraw', ['expected_version' => 1]);
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+
+        $access = '/admin/users/'.$this->provider->id.'/access';
+        $path = '/activities/'.$this->activity->id;
+        $this->actingAs($admin)->post($access, [
+            'action' => 'suspend', 'expected_version' => 1, 'reason' => 'Private review reason',
+        ])->assertRedirect();
+        $this->actingAs($first)->get('/activities')->assertOk()->assertDontSee('Junior Music');
+        $this->get($path)->assertOk()->assertSee('No trial sessions are accepting interest.')
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $this->get('/parent')->assertOk()->assertSee('The provider is currently unavailable')->assertDontSee('Accept seat offer');
+        $this->post($path.'/interest', [...$input, 'child_name' => 'New child', 'trial_session' => 2,
+            'expected_activity_version' => 3, 'interest_terms' => 1])->assertStatus(409);
+        $this->post($path.'/interest', [...$input, 'child_name' => 'New waitlist child', 'waitlist' => 1,
+            'expected_activity_version' => 3, 'interest_terms' => 1])->assertStatus(409);
+        $this->post('/parent/interests/'.$offer->id.'/waitlist', [
+            'decision' => 'accept', 'expected_version' => 2, 'expected_activity_version' => 3,
+        ])->assertStatus(409);
+        $this->travel(24)->hours();
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+        $this->assertSame('withdrawn', $offer->fresh()->status);
+        $this->assertSame('waitlisted', $next->fresh()->status);
+        $this->get('/notifications')->assertOk()->assertSee('Seat offer expired')->assertDontSee('Private review reason');
+
+        $this->actingAs($admin)->post($access, [
+            'action' => 'activate', 'expected_version' => 2, 'reason' => 'Review complete',
+        ])->assertRedirect();
+        $this->artisan('gotry:process-waitlists')->assertSuccessful();
+        $this->actingAs($second)->get('/activities')->assertOk()->assertSee('Junior Music');
+        $this->get('/notifications')->assertOk()->assertSee('Review seat offer')->assertDontSee('Seat offer expired');
+        $this->get('/parent')->assertOk()->assertSee('Accept seat offer')->assertDontSee('The provider is currently unavailable');
+        $this->post('/parent/interests/'.$next->id.'/waitlist', [
+            'decision' => 'accept', 'expected_version' => 2, 'expected_activity_version' => 4,
+        ])->assertRedirect('/parent');
+        $this->assertSame('interested', $next->fresh()->status);
+    }
+
     public function test_processing_expires_existing_offers_without_refilling_closed_sessions(): void
     {
         $service = app(ParentInterests::class);
