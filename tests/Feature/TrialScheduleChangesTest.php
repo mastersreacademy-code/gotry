@@ -164,7 +164,10 @@ class TrialScheduleChangesTest extends TestCase
         $url = '/activities/'.$this->activity->id.'/interest';
         $data = ['child_name' => 'Private waiting child', 'child_age' => 8, 'trial_session' => 1,
             'expected_activity_version' => 2, 'interest_terms' => 1, 'waitlist' => 1];
-        $this->actingAs($first)->get('/activities/'.$this->activity->id)->assertOk()->assertSee('Join waitlist');
+        $this->actingAs($first)->get('/activities')->assertOk()->assertSee('2 sessions open')->assertSee('Waitlist also open')
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $this->get('/activities/'.$this->activity->id)->assertOk()->assertSee('Join waitlist')
+            ->assertSee('data-intent="waitlist"', false)->assertSee('data-intent="register"', false);
         $this->post($url, $data)->assertRedirect('/parent');
         $this->post($url, $data)->assertRedirect('/parent');
         $this->actingAs($second)->post($url, $data)->assertRedirect('/parent');
