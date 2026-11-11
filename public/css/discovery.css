@@ -154,3 +154,75 @@
     font-size: clamp(1rem, 3vw, 1.35rem);
 }
 .activity-final-action p { margin: .55rem 0 0; font-size: .875rem; }
+
+.activity-page {
+    --ink: #101f61;
+    --accent: #c60058;
+    padding: clamp(.75rem, 2vw, 1.5rem);
+    border-radius: 28px;
+    background: linear-gradient(#fff 5%, #edf5ff 42%, #f8fbff);
+}
+.activity-masthead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .65rem 1rem;
+    padding: .25rem 0 1rem;
+}
+.activity-masthead > div { flex: 1 1 10rem; overflow-wrap: anywhere; }
+.activity-masthead small { display: block; }
+.activity-wordmark {
+    font-size: clamp(1.5rem, 4vw, 2.4rem);
+    letter-spacing: -.065em;
+    padding-right: 1rem;
+    border-right: 1px solid var(--line);
+}
+.activity-wordmark span { color: #c60058; }
+.activity-page .activity-hero { background: linear-gradient(125deg, #0054ae, #087fc5); }
+.activity-page .activity-category { background: #ffd525; text-transform: uppercase; }
+.activity-page .panel { border-radius: 23px; box-shadow: 0 6px 14px #143e7420; }
+.activity-page h2 { color: var(--ink); letter-spacing: -.025em; }
+.activity-page .discovery-detail { grid-template-columns: minmax(0, 4fr) minmax(0, 5fr); align-items: stretch; }
+.activity-page .activity-deadline { padding: clamp(1rem, 3vw, 1.5rem); }
+.activity-deadline h2, .activity-deadline p { margin: 0; }
+.activity-deadline h2 { margin-bottom: .25rem; }
+.activity-deadline time { font-size: 1.15rem; }
+.activity-how h2 { margin: 0; }
+.activity-how .activity-steps {
+    list-style: none;
+    counter-reset: activity-step;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .65rem;
+    padding: 0;
+    margin-bottom: 0;
+}
+.activity-steps li {
+    counter-increment: activity-step;
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding: .65rem;
+    border-radius: 14px;
+    background: #e7f4ff;
+}
+.activity-steps li:nth-child(2) { background: #fff5df; }
+.activity-steps li:nth-child(3) { background: #eaf7e7; }
+.activity-steps li::before {
+    content: counter(activity-step);
+    flex: 0 0 1.75rem;
+    border-radius: 50%;
+    line-height: 1.75rem;
+    text-align: center;
+    background: var(--ink);
+    color: white;
+    font-weight: 750;
+}
+.activity-final-action .button:not(.secondary) {
+    background: linear-gradient(#dd0968, #b90050);
+}
+.activity-final-action .button:not(.secondary):hover { background: #a90048; }
+.activity-registration { margin-top: 1.25rem; }
+@media (max-width: 700px) {
+    .activity-page .discovery-detail, .activity-how .activity-steps { grid-template-columns: minmax(0, 1fr); }
+}
