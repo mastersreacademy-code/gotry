@@ -90,7 +90,15 @@ class ProviderActivityController
     public function show(Request $request, Activity $activity, ActivityDraft $schema, ProgrammePricing $pricing, ParentInterests $interests)
     {
         abort_unless($activity->provider_id === $request->user()->id, 404);
-        return view('provider.show', ['activity' => $activity, 'sessions' => $interests->sessionSummary($activity), 'review' => $this->review($schema, $activity->details), 'prices' => $pricing->preview($activity->details)]);
+        $sessions = $interests->sessionSummary($activity);
+
+        return view('provider.show', [
+            'activity' => $activity,
+            'sessions' => $sessions,
+            'singleTrialInterest' => $sessions === [] ? $interests->activeInterests($activity, null)->count() : null,
+            'review' => $this->review($schema, $activity->details),
+            'prices' => $pricing->preview($activity->details),
+        ]);
     }
 
     public function offer(Request $request, Activity $activity, ParentInterests $service)

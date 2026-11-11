@@ -15,7 +15,14 @@
     @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
     @if($activity->review_reason)<p class="notice"><strong>Admin feedback:</strong> {{ $activity->review_reason }}</p>@endif
     <div class="panel provider-management">
-    @include('provider.partials.trial-sessions')
+    @if($singleTrialInterest !== null)
+        <section class="review-section">
+            <h2>Trial interest</h2>
+            <p><strong>{{ $singleTrialInterest }}</strong> {{ $singleTrialInterest === 1 ? 'active registration' : 'active registrations' }}</p>
+        </section>
+    @else
+        @include('provider.partials.trial-sessions')
+    @endif
     @if($errors->any())<p class="error" role="alert">{{ $errors->first() }}</p>@endif
     @foreach($sessions as $number => $session)
         @if($session['can_offer'] && $session['waiting'] > 0)

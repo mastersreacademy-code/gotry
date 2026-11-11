@@ -87,6 +87,35 @@ class ProviderActivityTest extends TestCase
         $this->post('/admin/activities/1/decision', ['action' => 'approve', 'expected_version' => 1])->assertRedirect();
         $this->get('/activities/1')->assertOk()->assertSee('2027-01-12 11:30')->assertDontSee('private-contact@example.test')
             ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $this->actingAs($this->user('parent'))->post('/activities/1/interest', [
+            'child_name' => 'Private trial participant', 'child_age' => 8, 'trial_session' => 2,
+            'expected_activity_version' => 2, 'interest_terms' => 1,
+        ])->assertRedirect('/parent');
+        $this->actingAs($provider)->post('/provider/activities/1/reschedule', [
+            'trial_session' => 2, 'trial_date' => '2027-01-11', 'trial_time' => '11:30',
+            'expected_activity_version' => 2, 'reschedule_confirm' => 1,
+        ])->assertRedirect();
+        $this->get('/provider/activities/1')->assertOk()->assertSeeInOrder(['2027-01-11 11:30', '1 active interests'])
+            ->assertDontSee('Private trial participant');
+    }
+
+    public function test_provider_can_monitor_single_trial_interest_after_admin_approval(): void
+    {
+        $provider = $this->user();
+        $token = $this->draft($provider);
+        $this->post('/provider/submit', $this->submit($token))->assertRedirect('/provider/activities/1');
+        $activity = Activity::sole();
+        $this->get('/provider/activities/'.$activity->id)->assertOk()->assertSee('active registrations');
+
+        $this->actingAs($this->user('admin'))->post('/admin/activities/'.$activity->id.'/decision', [
+            'action' => 'approve', 'expected_version' => 1,
+        ])->assertRedirect();
+        $this->actingAs($this->user('parent'))->post('/activities/'.$activity->id.'/interest', [
+            'child_name' => 'Private child', 'child_age' => 8, 'expected_activity_version' => 2, 'interest_terms' => 1,
+        ])->assertRedirect('/parent');
+        $this->actingAs($provider)->get('/provider/activities/'.$activity->id)->assertOk()
+            ->assertSee('active registration')->assertSeeInOrder(['Trial interest', '1', 'active registration'])
+            ->assertDontSee('Private child')->assertHeader('X-Robots-Tag', 'noindex, nofollow');
     }
 
     public function test_steps_cannot_be_skipped_and_invalid_input_is_not_saved(): void
