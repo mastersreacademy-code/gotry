@@ -1,0 +1,39 @@
+.parent-ui {
+    --parent-ink: #172749;
+    --parent-action: #b51560;
+    --parent-border: #dde5f1;
+    color: var(--parent-ink);
+}
+
+.parent-banner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: clamp(1.25rem, 5vw, 3rem);
+    border-radius: 24px;
+    background: #e9efff;
+}
+.parent-banner h1 { margin: .25rem 0; letter-spacing: -.04em; overflow-wrap: anywhere; }
+.parent-banner p { margin: 0; }
+.parent-list-title { margin-top: 2rem; }
+.parent-ui :is(button, .button):not(.secondary) { background: var(--parent-action); color: #fff; }
+.parent-ui :is(button, .button):not(.secondary):hover { background: #94104d; }
+.parent-card { min-width: 0; overflow-wrap: anywhere; }
+.parent-card h3 { font-size: 1.35rem; margin: .75rem 0 .25rem; }
+.parent-card p { margin: .35rem 0; }
+.parent-card .parent-deadline { margin: 1rem 0 .75rem; color: #652045; }
+.parent-card form button { margin-top: .35rem; margin-right: .25rem; }
+.parent-card-offer { border-color: #dfa5c1; background: #fff7fb; }
+.parent-status-offered { color: #801245; background: #f9dcec; }
+.parent-status-interested { color: #114982; background: #e2eeff; }
+.parent-status-waitlisted { color: #704b05; background: #fff0c7; }
+.parent-card-offer .parent-status-offered { font-weight: 700; }
+.parent-status-withdrawn, .parent-status-inactive { color: #52627b; background: #edf0f5; }
+.parent-manage { margin-top: 1rem; border-top: 1px solid var(--parent-border); padding-top: .75rem; }
+.parent-manage summary { color: #164c91; cursor: pointer; font-weight: 700; }
+.parent-manage summary:focus-visible { outline: 3px solid #246dcc; outline-offset: 3px; }
+.parent-manage form + form { margin-top: 1rem; }
+.parent-empty { grid-column: 1 / -1; border-style: dashed; }
+.parent-empty h3 { margin-top: 0; }
