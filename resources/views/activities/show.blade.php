@@ -4,7 +4,7 @@
 <link rel="stylesheet" href="{{ asset('css/discovery.css') }}">
 @endpush
 @section('content')
-<div class="discovery-ui">
+<div class="discovery-ui activity-page">
     <a class="activity-back" href="{{ route('activities.index') }}">← Explore activities</a>
     @php
         $openSessions = array_filter($sessions, fn ($session) => $session['open'] || $session['can_waitlist']);
@@ -12,12 +12,16 @@
         $canWaitlist = collect($openSessions)->contains('can_waitlist', true);
     @endphp
     @php($soccer = $category === 'Sports & Fitness' && \Illuminate\Support\Str::contains(\Illuminate\Support\Str::lower($title), 'soccer'))
+    <div class="activity-masthead">
+        <strong class="activity-wordmark">Go<span>Try</span></strong>
+        <div><strong>{{ $details['business_name'] ?? $title }}</strong><small>{{ $category }}</small></div>
+        <span class="discovery-badge {{ $canRegister ? 'discovery-badge-open' : ($canWaitlist ? 'discovery-badge-wait' : '') }}">{{ $canRegister ? 'Interest open' : ($canWaitlist ? 'Waitlist open' : 'Trial closed') }}</span>
+    </div>
     <section @class(['activity-hero', 'activity-hero-photo' => $soccer])>
         <div class="activity-hero-copy">
             <p class="activity-category">Try before you enrol</p>
             <h1>{{ $title }}</h1>
             <p class="activity-description preserve-lines">{{ $details['description'] }}</p>
-            <a class="button activity-trial-link" href="#trial">View trial availability ↓</a>
         </div>
         @if($soccer)
             <img src="{{ asset('images/soccer-trial.webp') }}" alt="" width="1200" height="800" fetchpriority="high">
@@ -28,18 +32,14 @@
     <dl class="activity-facts">
         <div><dt>Ages</dt><dd>{{ $details['min_age'] }}–{{ $details['max_age'] }} years</dd></div>
         <div><dt>Venue</dt><dd>{{ $details['venue'] }}</dd></div>
-        <div><dt>Trial format</dt><dd>{{ $details['trial_type'] === 'group' ? 'Group session' : 'Individual lesson' }}</dd></div>
-        <div><dt>Duration</dt><dd>{{ $details['trial_duration'] }} minutes</dd></div>
+        <div><dt>Usual lessons</dt><dd>{{ $details['regular_format'] === 'individual' ? 'Individual lessons' : (!empty($details['class_times']) ? 'Multiple class times' : $details['regular_day']) }}</dd></div>
+        <div><dt>Programme</dt><dd>{{ $details['regular_format'] === 'group' ? $details['lessons_per_term'].' lessons per term' : 'Ask about availability' }}</dd></div>
     </dl>
     </section>
     <div class="discovery-detail">
-    <section class="panel discovery-trial" id="trial">
+    <section class="panel discovery-trial">
         <p class="eyebrow">Free introductory trial</p>
-        <h2>{{ $canRegister ? 'Register interest for the trial' : ($canWaitlist ? 'Join the trial waitlist' : 'Trial availability') }}</h2>
-        <div class="activity-deadline">
-            <strong>Register interest by</strong>
-            <time datetime="{{ $details['deadline'] }}">{{ \Illuminate\Support\Carbon::parse($details['deadline'])->format('D, j M Y') }}</time>
-        </div>
+        <h2>{{ $details['trial_type'] === 'group' ? 'Trial class' : 'Individual trial' }}</h2>
         @if($details['trial_type'] === 'group')
             <dl class="activity-trial-facts">
                 @if($sessions === [])
@@ -51,6 +51,7 @@
         @else
             <p class="preserve-lines">Ask provider about availability: {{ $details['trial_availability'] }}</p>
         @endif
+        <p><strong>{{ $details['trial_duration'] }} minutes</strong> · One introductory trial per child</p>
         @if($sessions !== [])
             <p>Each session needs at least {{ $details['trial_min'] }} participants.</p>
             <ul class="discovery-sessions">
@@ -67,6 +68,64 @@
             <p>{{ $availability['count'] }} registered · {{ $availability['remaining'] }} places remaining (maximum {{ $availability['capacity'] }})</p>
             <p>Minimum {{ $details['trial_min'] }} participants needed. {{ $availability['minimum_reached'] ? 'Minimum interest reached; this is not yet a confirmed booking.' : 'The trial will only proceed when the required minimum is reached and confirmed.' }}</p>
         @else<p>Individual trial: register an enquiry and the provider will arrange availability. There is no shared group-seat limit.</p>@endif
+    </section>
+    <section class="panel discovery-programme">
+        <h2>Usual lessons</h2>
+        @if(!empty($details['bring']))<p><strong>What to bring</strong><br>{{ $details['bring'] }}</p>@endif
+        @if($details['regular_format'] === 'individual')<p class="preserve-lines">{{ $details['usual_availability'] }}</p>
+        @elseif(!empty($details['class_times']))<p class="preserve-lines">{{ $details['class_times'] }}</p>
+        @else<p>{{ $details['regular_day'] }} · {{ $details['regular_time'] }}</p>@endif
+        @if(count($prices))
+            <h2>Programme price</h2>
+            @if($details['regular_format'] === 'group')<p>{{ $details['lessons_per_term'] }} lessons per term</p>@endif
+            <div class="activity-prices">
+                @foreach($prices as $price)
+                    <div class="activity-price">
+                        <h3>{{ $price['label'] }}</h3>
+                        @if($price['label'] === 'Standard group' && isset($details['regular_standard'], $details['regular_max']))
+                            <small>{{ $details['regular_standard'] }}–{{ $details['regular_max'] }} children</small>
+                        @elseif($price['label'] === 'Small group' && isset($details['regular_min'], $details['regular_standard']) && $details['regular_min'] < $details['regular_standard'])
+                            <small>{{ $details['regular_min'] }}–{{ $details['regular_standard'] - 1 }} children</small>
+                        @endif
+                        <p class="activity-price-amount"><strong>${{ number_format($price['total'] / 100, 2) }}</strong> {{ $price['discount'] > 0 ? strtolower($price['period']) : ($details['regular_format'] === 'group' ? 'per term' : 'per lesson') }}</p>
+                        @if($price['discount'] > 0)
+                            <small>Regular price ${{ number_format($price['regular'] / 100, 2) }} · Save ${{ number_format($price['discount'] / 100, 2) }}</small>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @endif
+    </section>
+    </div>
+    <section class="panel activity-deadline">
+        <div>
+            <h2>{{ $details['trial_type'] === 'group' ? 'Minimum numbers deadline' : 'Enquiry deadline' }}</h2>
+            @if($details['trial_type'] === 'group')
+                <p>At least {{ $details['trial_min'] }} participants are needed for each trial session to proceed.</p>
+            @endif
+        </div>
+        <div><strong>Register interest by</strong><br>
+            <time datetime="{{ $details['deadline'] }}">{{ \Illuminate\Support\Carbon::parse($details['deadline'])->format('D, j M Y') }}</time>
+        </div>
+    </section>
+    @if($canRegister || $canWaitlist)
+        <section class="panel activity-how">
+            <h2>How it works</h2>
+            <ol class="activity-steps">
+                <li>{{ $canRegister ? 'Register interest for free.' : 'Join the waitlist for free.' }}</li>
+                <li>{{ $details['trial_type'] === 'individual' ? 'Arrange a trial time with the provider.' : 'Check your dashboard for updates' }}</li>
+                <li>Attend your trial once confirmed</li>
+            </ol>
+        </section>
+    @endif
+    @if(($canRegister || $canWaitlist) && (auth()->guest() || auth()->user()->role === 'parent'))
+        <div class="activity-final-action">
+            <a class="button" href="#trial">{{ $canRegister ? 'Register interest for the trial' : 'Join the trial waitlist' }} →</a>
+            <p>Registering interest is free. No payment is collected on this page.</p>
+        </div>
+    @endif
+    <section class="panel discovery-trial activity-registration" id="trial">
+        <h2>{{ $canRegister ? 'Register interest for the trial' : ($canWaitlist ? 'Join the trial waitlist' : 'Trial availability') }}</h2>
         @if($mine->isNotEmpty())<p>Your registrations: @foreach($mine as $interest){{ $interest->child_name }} ({{ $interest->status }})@unless($loop->last), @endunless @endforeach. <a href="{{ route('parent.dashboard') }}">Manage on your dashboard</a>.</p>@endif
         @if($errors->any())<div class="error" role="alert">{{ $errors->first() }}</div>@endif
         @if(!$canRegister && !$canWaitlist)
@@ -99,53 +158,6 @@
         @elseif(auth()->guest())<a class="button" href="{{ route('login', ['activity' => $activityId]) }}">Sign in as a parent to continue</a>
         @else<p>Parent accounts can register a child's interest. Your account is {{ auth()->user()->role }}.</p>@endif
     </section>
-    <section class="panel discovery-programme">
-        <h2>Usual lessons</h2>
-        @if(!empty($details['bring']))<p><strong>What to bring</strong><br>{{ $details['bring'] }}</p>@endif
-        @if($details['regular_format'] === 'individual')<p class="preserve-lines">{{ $details['usual_availability'] }}</p>
-        @elseif(!empty($details['class_times']))<p class="preserve-lines">{{ $details['class_times'] }}</p>
-        @else<p>{{ $details['regular_day'] }} · {{ $details['regular_time'] }}</p>@endif
-        @if(count($prices))
-            <h2>Programme price</h2>
-            @if($details['regular_format'] === 'group')<p>{{ $details['lessons_per_term'] }} lessons per term</p>@endif
-            <div class="activity-prices">
-                @foreach($prices as $price)
-                    <div class="activity-price">
-                        <h3>{{ $price['label'] }}</h3>
-                        @if($price['label'] === 'Standard group' && isset($details['regular_standard'], $details['regular_max']))
-                            <small>{{ $details['regular_standard'] }}–{{ $details['regular_max'] }} children</small>
-                        @elseif($price['label'] === 'Small group' && isset($details['regular_min'], $details['regular_standard']) && $details['regular_min'] < $details['regular_standard'])
-                            <small>{{ $details['regular_min'] }}–{{ $details['regular_standard'] - 1 }} children</small>
-                        @endif
-                        <p class="activity-price-amount"><strong>${{ number_format($price['total'] / 100, 2) }}</strong> {{ $price['discount'] > 0 ? strtolower($price['period']) : ($details['regular_format'] === 'group' ? 'per term' : 'per lesson') }}</p>
-                        @if($price['discount'] > 0)
-                            <small>Regular price ${{ number_format($price['regular'] / 100, 2) }} · Save ${{ number_format($price['discount'] / 100, 2) }}</small>
-                        @endif
-                    </div>
-                @endforeach
-            </div>
-        @endif
-        @if($canRegister || $canWaitlist)
-            <h2>How it works</h2>
-            <ol class="activity-steps">
-                @if($details['trial_type'] === 'individual')
-                    <li>Register your interest for free.</li>
-                    <li>Arrange a trial time with the provider.</li>
-                @else
-                    <li>{{ $canRegister ? 'Register interest for free.' : 'Join the waitlist for free.' }}</li>
-                    <li>Check your dashboard for trial updates or a seat offer.</li>
-                    <li>Attend the trial once the session is confirmed.</li>
-                @endif
-            </ol>
-        @endif
-    </section>
-    </div>
-    @if(($canRegister || $canWaitlist) && (auth()->guest() || auth()->user()->role === 'parent'))
-        <div class="activity-final-action">
-            <a class="button" href="#trial">{{ $canRegister ? 'Register interest for the trial' : 'Join the trial waitlist' }} →</a>
-            <p>Registering interest is free. No payment is collected on this page.</p>
-        </div>
-    @endif
 </div>
 <script type="module" src="{{ asset('js/trial-selection.mjs') }}"></script>
 @endsection
