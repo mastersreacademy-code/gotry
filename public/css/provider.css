@@ -119,3 +119,7 @@
     .wizard-steps .step-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
     .provider-banner { border-radius: 18px; }
 }
+
+@media (max-width: 600px) {
+    .provider-management > form button { width: 100%; overflow-wrap: anywhere; }
+}

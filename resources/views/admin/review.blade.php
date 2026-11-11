@@ -2,7 +2,7 @@
 @section('title', 'Review '.$activity->title.' · GoTry')
 @section('content')
 @include('admin.nav')
-<section class="panel">
+<section class="panel admin-trial-review">
     <a href="{{ route('admin.activities') }}">← All activities</a>
     <h1>{{ $activity->title }}</h1><span class="status status-{{ $activity->status }}">{{ $activity->statusLabel() }}</span>
     <p>Active interests: {{ $interestCount }}@if(($activity->details['trial_type'] ?? '')==='group') · Minimum {{ $activity->details['trial_min'] }} · Maximum {{ $activity->details['trial_max'] }} per trial @endif</p>

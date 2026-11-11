@@ -10,7 +10,7 @@
 </head>
 <body>
 <a class="skip-link" href="#main-content">Skip to content</a>
-<header>
+<header class="site-header">
     <a class="brand" href="{{ route('home') }}">Go<span>Try</span></a>
     <nav aria-label="Main navigation">
         <a href="{{ route('home') }}">Home</a>
