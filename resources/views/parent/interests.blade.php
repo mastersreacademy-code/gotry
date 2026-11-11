@@ -1,8 +1,19 @@
 @extends('layouts.app')
 @section('title', 'Your registrations · GoTry')
+@push('styles')
+<link rel="stylesheet" href="{{ asset('css/parent.css') }}">
+@endpush
 @section('content')
-<div class="heading-row"><div><p class="eyebrow">Parent dashboard</p><h1>Hello, {{ auth()->user()->name }}</h1></div><a class="button" href="{{ route('activities.index') }}">Explore activities →</a></div>
-<p>Manage your children's trial interest. Registering interest is free and does not confirm a place or request payment.</p>
+<div class="parent-ui">
+<section class="parent-banner">
+    <div>
+        <p class="eyebrow">Parent dashboard</p>
+        <h1>Hello, {{ auth()->user()->name }}</h1>
+        <p>Manage your children’s trial registrations, waitlists and seat offers.</p>
+    </div>
+    <a class="button" href="{{ route('activities.index') }}">Explore activities →</a>
+</section>
+<h2 class="parent-list-title">Your registrations</h2>
 @if(session('status'))<p class="notice" role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<div class="error" role="alert">{{ $errors->first() }}</div>@endif
 <div class="grid">
@@ -16,20 +27,24 @@
         $destinations = $openSessions[$activity->id] ?? [];
         unset($destinations[$interest->trial_session]);
         $slot = $availability[$activity->id][$interest->trial_session ?? 0];
+        $liveOffer = $interest->status === 'offered' && $interest->offer_expires_at->isFuture();
+        $canAccept = $liveOffer && $slot['accepting_offers'];
     @endphp
-    <article>
-        <span class="status {{ $interest->status === 'interested' ? 'status-pending_registrations' : 'status-withdrawn' }}">{{ match($interest->status) {
+    <article @class(['parent-card', 'parent-card-offer' => $canAccept])>
+        <span class="status {{ $interest->status === 'offered' && ! $canAccept ? 'parent-status-inactive' : 'parent-status-'.$interest->status }}">{{ match($interest->status) {
             'interested' => 'Interest registered', 'waitlisted' => 'On waitlist',
-            'offered' => $interest->offer_expires_at->isFuture() ? 'Seat offered' : 'Offer expired',
+            'offered' => $canAccept ? 'Seat offered' : ($liveOffer ? 'Offer unavailable' : 'Offer expired'),
             default => 'Withdrawn',
         } }}</span>
-        <h2>@if($activity->status === 'pending_registrations')<a href="{{ route('activities.show', $activity) }}">{{ $activity->title }}</a>@else{{ $activity->title }}@endif</h2>
+        <h3>@if($activity->status === 'pending_registrations')<a href="{{ route('activities.show', $activity) }}">{{ $activity->title }}</a>@else{{ $activity->title }}@endif</h3>
         <p>{{ $interest->child_name }} · Age {{ $interest->child_age }}</p>
-        <p>Activity status: {{ $activity->statusLabel() }}</p>
+
         @if($sessionStart)
             <p>{{ $sessionStart }} (Sydney) · {{ \App\Models\Activity::STATUSES[$sessionStatus] }}</p>
-        @elseif(($activity->details['trial_type'] ?? '')==='group')<p>{{ $activity->details['trial_date'] }} · {{ $activity->details['trial_time'] }} (Sydney)</p>@endif
+        @elseif(($activity->details['trial_type'] ?? '')==='group')<p>{{ $activity->details['trial_date'] }} · {{ $activity->details['trial_time'] }} (Sydney) · {{ $activity->statusLabel() }}</p>@else<p>{{ $activity->statusLabel() }}</p>@endif
         @if($interest->status === 'interested')
+            <details class="parent-manage" @if($errors->any()) open @endif>
+            <summary>Manage registration</summary>
             <form method="post" action="{{ route('parent.withdraw', $interest) }}">@csrf
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">
                 <label class="check-row"><input type="checkbox" name="withdraw_confirm" value="1" required> I want to withdraw this registration.</label>
@@ -50,15 +65,16 @@
                 <button type="submit">Move interest</button>
             </form>
             @endif
+            </details>
         @elseif(in_array($interest->status, ['waitlisted', 'offered'], true))
             <form method="post" action="{{ route('parent.waitlist', $interest) }}">@csrf
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">
                 <input type="hidden" name="expected_activity_version" value="{{ $activity->version }}">
-                @if($interest->status === 'offered' && $interest->offer_expires_at->isFuture() && $slot['accepting_offers'])
-                    <p>Accept by {{ $interest->offer_expires_at->copy()->setTimezone('Australia/Sydney')->format('Y-m-d H:i T') }}.</p>
+                @if($canAccept)
+                    <p class="parent-deadline">Accept by <strong>{{ $interest->offer_expires_at->copy()->setTimezone('Australia/Sydney')->format('Y-m-d H:i T') }}</strong></p>
                     <button type="submit" name="decision" value="accept">Accept seat offer</button>
                 @endif
-                <button class="secondary" type="submit" name="decision" value="leave">Leave waitlist</button>
+                <button class="secondary" type="submit" name="decision" value="leave">{{ $canAccept ? 'Decline offer' : ($interest->status === 'offered' ? 'Close entry' : 'Leave waitlist') }}</button>
             </form>
         @elseif($slot['open'])
             <form method="post" action="{{ route('parent.restore', $interest) }}">@csrf
@@ -69,7 +85,13 @@
             </form>
         @else<p>{{ $slot['reason'] }}</p>@endif
     </article>
-@empty<p>No registrations yet. Explore activities to find a trial.</p>@endforelse
+@empty
+    <article class="parent-empty">
+        <h3>No registrations yet</h3>
+        <p>Explore activities to find a trial. Registering interest is free and does not confirm a place.</p>
+    </article>
+@endforelse
 </div>
 {{ $interests->links() }}
+</div>
 @endsection
