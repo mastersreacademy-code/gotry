@@ -32,7 +32,7 @@ class SoccerDetailPageTest extends TestCase
             'provider_id' => $provider->id,
             'submission_token' => Str::uuid(),
             'title' => 'Junior Soccer',
-            'category' => 'Sport',
+            'category' => 'Sports & Fitness',
             'status' => 'pending_registrations',
             'version' => 2,
             'submitted_at' => now(),
@@ -62,6 +62,7 @@ class SoccerDetailPageTest extends TestCase
         $this->get('/activities/'.$activity->id)
             ->assertOk()
             ->assertSee('Junior Soccer')
+            ->assertSee('activity-hero-photo', false)
             ->assertSee('href="#trial"', false)
             ->assertSee('data-trial-deadline=', false)
             ->assertSee('data-days', false)
