@@ -50,6 +50,8 @@ test('registration and waitlist actions track selected session and recover on pa
   const waitlist = page.locator('button[data-intent="waitlist"]');
   await expect(register).toBeDisabled();
   await expect(waitlist).toBeDisabled();
+  await expect(register).toBeVisible();
+  await expect(waitlist).toBeVisible();
 
   await page.locator('#trial_session').selectOption('1');
   await expect(register).toBeVisible();
@@ -66,6 +68,7 @@ test('registration and waitlist actions track selected session and recover on pa
     window.dispatchEvent(new Event('pageshow'));
   });
   await expect(register).toBeEnabled();
+  await expect(register).toBeVisible();
   await expect(waitlist).toBeHidden();
 });
 
