@@ -15,7 +15,8 @@ test('soccer countdown starts hidden, displays time, and hides after expiry', as
       <span><strong data-minutes></strong>Mins</span>
     </div>
   </div>`);
-  await page.addStyleTag({ url: '/css/app.css' });
+  // Deliberately omit app.css here: its global [hidden] !important rule
+  // would mask a regression in discovery.css itself.
   await page.addStyleTag({ url: '/css/discovery.css' });
   const countdown = page.locator('[data-trial-deadline]');
   await expect(countdown).toBeHidden();
@@ -73,7 +74,7 @@ for (const width of [375, 768, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await page.route('**/activities', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>' }));
   await page.goto('/activities');
-    await page.setContent(`<div class="discovery-ui activity-page">
+    await page.setContent(`<main><div class="discovery-ui activity-page">
       <section class="activity-hero activity-hero-photo">
         <div class="activity-hero-copy"><h1>Junior Soccer</h1>
           <p class="activity-description">Try soccer with a friendly local team</p></div>
@@ -91,9 +92,9 @@ for (const width of [375, 768, 1440]) {
       </div>
       <div class="activity-final-action"><a class="button" href="#trial">Register interest</a></div>
       <section id="trial" class="panel activity-registration"><h2>Register interest</h2></section>
-    </div>`);
+    </div></main>`);
     await page.addStyleTag({ url: '/css/app.css' });
-  await page.addStyleTag({ url: '/css/discovery.css' });
+    await page.addStyleTag({ url: '/css/discovery.css' });
     const metrics = await page.evaluate(() => ({
       content: document.documentElement.scrollWidth,
       viewport: document.documentElement.clientWidth,
