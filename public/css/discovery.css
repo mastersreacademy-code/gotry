@@ -299,3 +299,25 @@
     .activity-hero-photo::after { content: none; }
     .activity-page .activity-overview { margin-top: -.65rem; }
 }
+
+.activity-countdown {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+}
+.activity-countdown span {
+    min-width: 3.5rem;
+    border: 1px solid #f393b9;
+    border-radius: 12px;
+    padding: .35rem .6rem;
+    background: #fff;
+    text-align: center;
+    font-size: .8rem;
+}
+.activity-countdown strong {
+    display: block;
+    color: #b50049;
+    font-size: 1.6rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
