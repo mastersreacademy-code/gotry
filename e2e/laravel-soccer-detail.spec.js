@@ -70,6 +70,16 @@ test('registration and waitlist actions track selected session and recover on pa
   await expect(register).toBeEnabled();
   await expect(register).toBeVisible();
   await expect(waitlist).toBeHidden();
+
+  // A restored form may have no selected session after availability changes.
+  await page.locator('#trial_session').evaluate(el => {
+    el.value = '';
+    window.dispatchEvent(new Event('pageshow'));
+  });
+  await expect(register).toBeDisabled();
+  await expect(waitlist).toBeDisabled();
+  await expect(register).toBeVisible();
+  await expect(waitlist).toBeVisible();
 });
 
 for (const width of [375, 768, 1440]) {
