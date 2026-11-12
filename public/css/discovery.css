@@ -300,6 +300,7 @@
     .activity-page .activity-overview { margin-top: -.65rem; }
 }
 
+.activity-countdown[hidden] { display: none; }
 .activity-countdown {
     display: flex;
     flex-wrap: wrap;
