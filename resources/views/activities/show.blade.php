@@ -105,7 +105,7 @@
             <time datetime="{{ $details['deadline'] }}">{{ \Illuminate\Support\Carbon::parse($details['deadline'])->format('D, j M Y') }}</time>
         </div>
         @if($canRegister || $canWaitlist)
-            <div class="activity-countdown" data-trial-deadline="{{ \Illuminate\Support\CarbonImmutable::parse($details['deadline'], 'Australia/Sydney')->addDay()->startOfDay()->toIso8601String() }}" role="group" aria-label="Time left until the interest deadline" hidden>
+            <div class="activity-countdown" data-trial-deadline="{{ \Carbon\CarbonImmutable::parse($details['deadline'], 'Australia/Sydney')->addDay()->startOfDay()->toIso8601String() }}" role="group" aria-label="Time left until the interest deadline" hidden>
                 <span><strong data-days></strong>Days</span>
                 <span><strong data-hours></strong>Hours</span>
                 <span><strong data-minutes></strong>Mins</span>
