@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Activity;
+use App\Models\Interest;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -116,6 +117,13 @@ class SoccerDetailPageTest extends TestCase
             'trial_session' => 1,
             'interest_terms' => 1,
         ])->assertRedirect();
+        $this->assertDatabaseHas('interests', [
+            'activity_id' => $activity->id,
+            'parent_id' => $first->id,
+            'trial_session' => 1,
+            'status' => 'interested',
+        ]);
+        $this->assertSame(1, Interest::where('activity_id', $activity->id)->count());
 
         $this->actingAs($second)->get('/activities/'.$activity->id)
             ->assertOk()
@@ -124,6 +132,7 @@ class SoccerDetailPageTest extends TestCase
             ->assertSee('value="1" data-intent="waitlist"', false)
             ->assertSee('value="2" data-intent="register"', false)
             ->assertSee('href="#trial"', false);
+        $this->assertSame(1, Interest::where('activity_id', $activity->id)->count());
     }
 
     public function test_expired_deadline_has_no_registration_cta_or_countdown(): void
