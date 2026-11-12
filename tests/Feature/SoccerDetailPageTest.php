@@ -92,6 +92,40 @@ class SoccerDetailPageTest extends TestCase
             ->assertDontSee('data-intent="waitlist"', false);
     }
 
+
+    public function test_full_session_offers_waitlist_without_register_action(): void
+    {
+        $activity = $this->activity(['extra_trial_times' => '2026-12-11 10:00']);
+        $first = User::create([
+            'name' => 'First Parent',
+            'email' => Str::uuid().'@example.test',
+            'password' => 'test password',
+            'role' => 'parent',
+        ]);
+        $second = User::create([
+            'name' => 'Second Parent',
+            'email' => Str::uuid().'@example.test',
+            'password' => 'test password',
+            'role' => 'parent',
+        ]);
+
+        $this->actingAs($first)->post('/activities/'.$activity->id.'/interest', [
+            'child_name' => 'First Child',
+            'child_age' => 8,
+            'expected_activity_version' => 2,
+            'trial_session' => 1,
+            'interest_terms' => 1,
+        ])->assertRedirect();
+
+        $this->actingAs($second)->get('/activities/'.$activity->id)
+            ->assertOk()
+            ->assertSee('data-intent="waitlist"', false)
+            ->assertSee('data-intent="register"', false)
+            ->assertSee('value="1" data-intent="waitlist"', false)
+            ->assertSee('value="2" data-intent="register"', false)
+            ->assertSee('href="#trial"', false);
+    }
+
     public function test_expired_deadline_has_no_registration_cta_or_countdown(): void
     {
         $activity = $this->activity(['deadline' => '2026-11-09']);
