@@ -5,6 +5,7 @@ import { test, expect } from '@playwright/test';
 // so tests do not depend on seeded activities or user accounts.
 test('soccer countdown starts hidden, displays time, and hides after expiry', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-11-12T00:00:00Z') });
+  await page.route('**/activities', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>' }));
   await page.goto('/activities');
   await page.setContent(`<div class="discovery-ui activity-page">
     <div class="activity-countdown" data-trial-deadline="2026-11-12T00:01:00Z"
@@ -14,6 +15,7 @@ test('soccer countdown starts hidden, displays time, and hides after expiry', as
       <span><strong data-minutes></strong>Mins</span>
     </div>
   </div>`);
+  await page.addStyleTag({ url: '/css/app.css' });
   await page.addStyleTag({ url: '/css/discovery.css' });
   const countdown = page.locator('[data-trial-deadline]');
   await expect(countdown).toBeHidden();
@@ -31,6 +33,7 @@ test('soccer countdown starts hidden, displays time, and hides after expiry', as
 });
 
 test('registration and waitlist actions track selected session and recover on pageshow', async ({ page }) => {
+  await page.route('**/activities', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>' }));
   await page.goto('/activities');
   await page.setContent(`<form data-trial-form>
     <select id="trial_session">
@@ -68,7 +71,8 @@ test('registration and waitlist actions track selected session and recover on pa
 for (const width of [375, 768, 1440]) {
   test(`soccer activity layout does not overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto('/activities');
+    await page.route('**/activities', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>' }));
+  await page.goto('/activities');
     await page.setContent(`<div class="discovery-ui activity-page">
       <section class="activity-hero activity-hero-photo">
         <div class="activity-hero-copy"><h1>Junior Soccer</h1>
@@ -88,7 +92,8 @@ for (const width of [375, 768, 1440]) {
       <div class="activity-final-action"><a class="button" href="#trial">Register interest</a></div>
       <section id="trial" class="panel activity-registration"><h2>Register interest</h2></section>
     </div>`);
-    await page.addStyleTag({ url: '/css/discovery.css' });
+    await page.addStyleTag({ url: '/css/app.css' });
+  await page.addStyleTag({ url: '/css/discovery.css' });
     const metrics = await page.evaluate(() => ({
       content: document.documentElement.scrollWidth,
       viewport: document.documentElement.clientWidth,
