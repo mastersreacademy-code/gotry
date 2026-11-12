@@ -10,6 +10,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:8787',
     trace: 'retain-on-failure',
+    launchOptions: process.env.GOTRY_CHROMIUM_PATH
+      ? { executablePath: process.env.GOTRY_CHROMIUM_PATH }
+      : {},
     screenshot: 'only-on-failure',
   },
   projects: [
