@@ -7,7 +7,7 @@ test('soccer countdown starts hidden, displays time, and hides after expiry', as
   await page.clock.install({ time: new Date('2026-11-12T00:00:00Z') });
   await page.route('**/activities', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>' }));
   await page.goto('/activities');
-  await page.setContent(`<div class="discovery-ui activity-page">
+  await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><div class="discovery-ui activity-page">
     <div class="activity-countdown" data-trial-deadline="2026-11-12T00:01:00Z"
          role="group" aria-label="Time left until the interest deadline" hidden>
       <span><strong data-days></strong>Days</span>
@@ -36,7 +36,7 @@ test('soccer countdown starts hidden, displays time, and hides after expiry', as
 test('registration and waitlist actions track selected session and recover on pageshow', async ({ page }) => {
   await page.route('**/activities', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>' }));
   await page.goto('/activities');
-  await page.setContent(`<form data-trial-form>
+  await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><form data-trial-form>
     <select id="trial_session">
       <option value="">Choose a session</option>
       <option value="1" data-intent="register">Open session</option>
@@ -46,8 +46,8 @@ test('registration and waitlist actions track selected session and recover on pa
     <button data-intent="waitlist">Join waitlist</button>
   </form>`);
   await page.addScriptTag({ url: '/js/trial-selection.mjs', type: 'module' });
-  const register = page.getByRole('button', { name: 'Register interest' });
-  const waitlist = page.getByRole('button', { name: 'Join waitlist' });
+  const register = page.locator('button[data-intent="register"]');
+  const waitlist = page.locator('button[data-intent="waitlist"]');
   await expect(register).toBeDisabled();
   await expect(waitlist).toBeDisabled();
 
@@ -73,8 +73,8 @@ for (const width of [375, 768, 1440]) {
   test(`soccer activity layout does not overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.route('**/activities', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body></body></html>' }));
-  await page.goto('/activities');
-    await page.setContent(`<main><div class="discovery-ui activity-page">
+    await page.goto('/activities');
+    await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><main><div class="discovery-ui activity-page">
       <section class="activity-hero activity-hero-photo">
         <div class="activity-hero-copy"><h1>Junior Soccer</h1>
           <p class="activity-description">Try soccer with a friendly local team</p></div>
