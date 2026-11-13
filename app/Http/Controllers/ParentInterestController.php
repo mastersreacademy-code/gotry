@@ -7,6 +7,7 @@ use App\Models\Interest;
 use App\Services\ParentInterests;
 use App\Services\TrialSchedule;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class ParentInterestController
@@ -31,7 +32,10 @@ class ParentInterestController
                 if ($service->availability($activity, session: $number)['open']) $openSessions[$activity->id][$number] = $start;
             }
         }
-        return view('parent.interests', compact('interests', 'availability', 'openSessions', 'activityFilter'));
+        $payments = DB::table('trial_payments')->whereIn('interest_id', $interests->getCollection()->modelKeys())
+            ->get(['interest_id', 'attempt', 'paid_at'])->keyBy('interest_id');
+
+        return view('parent.interests', compact('interests', 'availability', 'openSessions', 'activityFilter', 'payments'));
     }
 
     public function store(Request $request, Activity $activity, ParentInterests $service)

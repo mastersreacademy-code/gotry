@@ -54,6 +54,21 @@
         @if($sessionStart)
             <p>{{ $sessionStart }} (Sydney) · {{ \App\Models\Activity::STATUSES[$sessionStatus] }}</p>
         @elseif(($activity->details['trial_type'] ?? '')==='group')<p>{{ $activity->details['trial_date'] }} · {{ $activity->details['trial_time'] }} (Sydney) · {{ $activity->statusLabel() }}</p>@else<p>{{ $activity->statusLabel() }}</p>@endif
+        @php($payment = $payments->get($interest->id))
+        @if($payment?->paid_at)
+            <p class="notice">Paid · AUD 2.00 · PayPal Sandbox</p>
+        @elseif($interest->status === 'interested' && $sessionStatus === 'proceeding_pending_payments' && $activity->provider?->is_active && config('paypal.client_id') && config('paypal.client_secret'))
+            @if($payment && session('payment_approval') === $payment->attempt)
+                <form method="post" action="{{ route('parent.payment.capture', $interest) }}">@csrf
+                    <input type="hidden" name="attempt" value="{{ $payment->attempt }}">
+                    <button type="submit">Confirm AUD 2.00 Sandbox payment</button>
+                </form>
+            @else
+                <form method="post" action="{{ route('parent.payment.start', $interest) }}">@csrf
+                    <button type="submit">Pay AUD 2.00 with PayPal Sandbox</button>
+                </form>
+            @endif
+        @endif
         @if($interest->status === 'interested')
             <details class="parent-manage" @if($errors->any()) open @endif>
             <summary>Manage registration</summary>
