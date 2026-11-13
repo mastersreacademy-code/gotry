@@ -10,6 +10,7 @@ use App\Services\ParentInterests;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -51,6 +52,56 @@ class ParentInterestTest extends TestCase
     {
         $this->actingAs($parent)->post('/activities/'.$activity->id.'/interest', $this->registration($name))->assertRedirect('/parent');
         return Interest::where('parent_id', $parent->id)->where('activity_id', $activity->id)->latest('id')->firstOrFail();
+    }
+
+    public function test_dashboard_records_only_a_verified_sandbox_capture_and_replays_safely(): void
+    {
+        $parent = $this->user();
+        $activity = $this->activity();
+        $interest = $this->register($parent, $activity);
+        $activity->update(['status' => 'proceeding_pending_payments']);
+        config(['paypal.client_id' => 'sandbox-client', 'paypal.client_secret' => 'sandbox-secret']);
+
+        $url = '/parent/interests/'.$interest->id.'/payment';
+        $approval = 'https://www.sandbox.paypal.com/checkoutnow?token=TESTORDER';
+        $api = 'https://api-m.sandbox.paypal.com';
+        $currency = 'USD';
+        Http::preventStrayRequests();
+        Http::fake([
+            $api.'/v1/oauth2/token' => Http::response(['access_token' => 'sandbox-token']),
+            $api.'/v2/checkout/orders' => Http::response([
+                'id' => 'TESTORDER',
+                'links' => [['rel' => 'payer-action', 'href' => $approval]],
+            ]),
+            $api.'/v2/checkout/orders/TESTORDER/capture' => function () use (&$currency, $interest) {
+                return Http::response([
+                    'id' => 'TESTORDER', 'status' => 'COMPLETED',
+                    'purchase_units' => [[
+                        'reference_id' => DB::table('trial_payments')->where('interest_id', $interest->id)->value('attempt'),
+                        'payments' => ['captures' => [[
+                            'id' => 'TESTCAPTURE', 'status' => 'COMPLETED',
+                            'amount' => ['currency_code' => $currency, 'value' => '2.00'],
+                        ]]],
+                    ]],
+                ]);
+            },
+        ]);
+
+        $this->get('/parent')->assertSee('Pay AUD 2.00 with PayPal Sandbox')->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $this->post($url)->assertRedirect($approval);
+        $attempt = DB::table('trial_payments')->where('interest_id', $interest->id)->value('attempt');
+        $this->get($url.'/return?token=OTHERORDER')->assertNotFound();
+        $this->get($url.'/return?token=TESTORDER')->assertRedirect('/parent');
+        $this->get('/parent')->assertSee('Confirm AUD 2.00 Sandbox payment');
+        $this->actingAs($this->user())->post($url.'/capture', ['attempt' => $attempt])->assertNotFound();
+        $this->actingAs($parent)->post($url.'/capture', ['attempt' => $attempt])->assertSessionHasErrors('payment');
+        $this->assertDatabaseHas('trial_payments', ['interest_id' => $interest->id, 'paid_at' => null]);
+        $currency = 'AUD';
+        $this->post($url.'/capture', ['attempt' => $attempt])->assertRedirect('/parent');
+        $this->post($url.'/capture', ['attempt' => $attempt])->assertRedirect('/parent');
+        Http::assertSentCount(6);
+        $this->assertDatabaseHas('trial_payments', ['interest_id' => $interest->id, 'capture_id' => 'TESTCAPTURE']);
+        $this->get('/parent')->assertSee('Paid · AUD 2.00 · PayPal Sandbox')->assertDontSee('Pay AUD 2.00 with PayPal Sandbox');
     }
 
     public function test_registers_interest_and_retries_normalized_child_name_without_duplicate_audit(): void

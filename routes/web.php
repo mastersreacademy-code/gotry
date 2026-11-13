@@ -5,6 +5,7 @@ use App\Http\Controllers\ProviderActivityController;
 use App\Http\Controllers\AdminActivityController;
 use App\Http\Controllers\ActivityDiscoveryController;
 use App\Http\Controllers\ParentInterestController;
+use App\Http\Controllers\ParentPaymentController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AdminWorkspaceController;
 use Illuminate\Http\Request;
@@ -34,6 +35,9 @@ Route::middleware('auth')->group(function (): void {
     })->name('dashboard');
     Route::middleware('role:parent')->group(function (): void {
         Route::get('/parent', [ParentInterestController::class, 'index'])->name('parent.dashboard');
+        Route::get('/parent/interests/{interest}/payment/return', [ParentPaymentController::class, 'returned'])->whereNumber('interest')->name('parent.payment.return');
+        Route::post('/parent/interests/{interest}/payment', [ParentPaymentController::class, 'start'])->whereNumber('interest')->middleware('throttle:interest-writes')->name('parent.payment.start');
+        Route::post('/parent/interests/{interest}/payment/capture', [ParentPaymentController::class, 'capture'])->whereNumber('interest')->middleware('throttle:interest-writes')->name('parent.payment.capture');
         Route::middleware('throttle:interest-writes')->group(function (): void {
             Route::post('/activities/{activity}/interest', [ParentInterestController::class, 'store'])->whereNumber('activity')->block(10, 10)->name('parent.interest');
             Route::post('/parent/interests/{interest}/withdraw', [ParentInterestController::class, 'withdraw'])->whereNumber('interest')->block(10, 10)->name('parent.withdraw');
