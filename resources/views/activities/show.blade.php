@@ -3,6 +3,7 @@
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/discovery.css') }}">
 @endpush
+@section('activity-masthead-navigation', 'enabled')
 @section('content')
 <div class="discovery-ui activity-page">
     @php
@@ -22,7 +23,13 @@
     <div class="activity-masthead">
         <a class="activity-wordmark" href="{{ route('home') }}"><img src="{{ $logo ? route('activities.branding', [$activityId, 'logo']) : asset('images/gotry-activity-logo.webp') }}" alt="GoTry home" width="146" height="97"></a>
         <div class="activity-organiser"><strong>{{ $details['business_name'] ?? $title }}</strong><small>{{ $category }}</small></div>
+        <div class="activity-masthead-actions">
         <span class="discovery-badge {{ $canRegister ? 'discovery-badge-open' : ($canWaitlist ? 'discovery-badge-wait' : '') }}">{{ $canRegister ? 'Interest open' : ($canWaitlist ? 'Waitlist open' : 'Trial closed') }}</span>
+            <details class="activity-menu">
+                <summary>Menu</summary>
+                @include('layouts.navigation')
+            </details>
+        </div>
     </div>
     <section @class(['activity-hero', 'activity-hero-photo' => $defaultPhoto && ! $background, 'activity-hero-branded' => $background])>
         <div class="activity-hero-copy">

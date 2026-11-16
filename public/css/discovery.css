@@ -362,3 +362,10 @@
     }
     .activity-page .discovery-detail > .panel { margin-top: 0; }
 }
+
+.activity-masthead-actions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.activity-menu { position: relative; z-index: 3; }
+.activity-menu summary { cursor: pointer; padding: .45rem .75rem; border: 1px solid #dbe4f3; border-radius: .65rem; background: #fff; color: #0b206a; font-weight: 700; }
+.activity-menu nav { position: absolute; inset-inline-end: 0; top: calc(100% + .35rem); display: grid; gap: .25rem; min-width: 10rem; padding: .5rem; border: 1px solid #dbe4f3; border-radius: .75rem; background: #fff; box-shadow: 0 8px 20px rgb(32 66 122 / 18%); }
+.activity-menu nav a { padding: .4rem .55rem; }
+.activity-menu nav form { margin: 0; }
