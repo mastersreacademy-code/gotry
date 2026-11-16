@@ -329,8 +329,6 @@
 .activity-hero-branded .activity-hero-copy { position: relative; z-index: 1; }
 
 @media (min-width: 701px) {
-    main:has(> .activity-page) { max-width: 94rem; }
-    .activity-page { max-width: 88rem; }
     .activity-page .activity-hero {
         margin-inline: 0;
         border-radius: 42% 24% 5% 5% / 9% 12% 6% 6%;
@@ -346,16 +344,17 @@
         padding: clamp(1.5rem, 4vw, 4rem) 0 clamp(3.5rem, 5vw, 5rem) clamp(1.5rem, 4vw, 4rem);
     }
     .activity-page .activity-hero-photo img {
-        grid-area: 1 / 1 / 2 / 3;
-        position: static;
-        justify-self: end;
-        align-self: center;
-        width: 67%;
-        height: auto;
-        object-fit: contain;
-        mask-image: linear-gradient(90deg, transparent, #000 31%);
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: right 43%;
     }
-    .activity-page .activity-hero-photo::after { content: none; }
+    .activity-page .activity-hero-photo::after {
+        content: "";
+        background: linear-gradient(90deg, #005bc6 5%, rgb(0 91 198 / 94%) 31%, rgb(0 117 211 / 40%) 51%, transparent 70%);
+    }
     .activity-page .activity-overview {
         margin: -2rem clamp(.5rem, 2vw, 1.5rem) 1rem;
         border-radius: 1.6rem;
