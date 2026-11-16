@@ -87,14 +87,18 @@
         @endif
         @if($interest->status === 'interested')
             <details class="parent-manage" @if($errors->any()) open @endif>
-            <summary>Manage registration</summary>
+            <summary>Remove from My List</summary>
             <form method="post" action="{{ route('parent.withdraw', $interest) }}">@csrf
+                <input type="hidden" name="return_to_dashboard" value="1">
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">
                 <label class="check-row"><input type="checkbox" name="withdraw_confirm" value="1" required> I want to withdraw this registration.</label>
                 @if($payment?->paid_at)<p>The Sandbox payment stays in your history.</p>@endif
-                <button class="secondary" type="submit">Remove from My List</button>
+                <button class="secondary" type="submit">Confirm removal</button>
             </form>
+            </details>
             @if(! $payment?->paid_at && $sessionStart && $destinations !== [] && \App\Services\TrialSchedule::startsAt($sessionStart)->isFuture())
+            <details class="parent-manage">
+            <summary>Move to another session</summary>
             <form method="post" action="{{ route('parent.transfer', $interest) }}">@csrf
                 <input type="hidden" name="return_to_dashboard" value="1">
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">
@@ -109,8 +113,8 @@
                 <label class="check-row"><input type="checkbox" name="transfer_confirm" value="1" required> Move this interest and release the original seat.</label>
                 <button type="submit">Move interest</button>
             </form>
-            @endif
             </details>
+            @endif
         @elseif(in_array($interest->status, ['waitlisted', 'offered'], true))
             <form method="post" action="{{ route('parent.waitlist', $interest) }}">@csrf
                 <input type="hidden" name="return_to_dashboard" value="1">
