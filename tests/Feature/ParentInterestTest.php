@@ -54,6 +54,22 @@ class ParentInterestTest extends TestCase
         return Interest::where('parent_id', $parent->id)->where('activity_id', $activity->id)->latest('id')->firstOrFail();
     }
 
+    public function test_home_lists_activities_and_parent_can_register_with_first_name_and_surname(): void
+    {
+        $activity = $this->activity();
+        $this->get('/')->assertOk()->assertSee('Junior Music')->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $parent = $this->user();
+        $url = '/activities/'.$activity->id;
+        $this->actingAs($parent)->get($url)->assertSee('child_first_name')->assertSee('child_surname');
+        $this->post($url.'/interest', [
+            'child_first_name' => 'Demo', 'child_surname' => 'Child', 'child_age' => 8,
+            'expected_activity_version' => $activity->version, 'interest_terms' => 1,
+        ])->assertRedirect('/parent');
+        $this->assertDatabaseHas('interests', ['parent_id' => $parent->id, 'child_name' => 'Demo Child']);
+        $this->get('/parent')->assertOk()->assertSee('Registered Interest')->assertSee('Remove from My List');
+        $this->get('/notifications')->assertRedirect('/parent#notifications');
+    }
+
     public function test_dashboard_records_only_a_verified_sandbox_capture_and_replays_safely(): void
     {
         $parent = $this->user();

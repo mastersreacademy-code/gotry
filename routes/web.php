@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ActivityBrandingController;
 use App\Http\Controllers\ProviderActivityController;
 use App\Http\Controllers\AdminActivityController;
 use App\Http\Controllers\ActivityDiscoveryController;
@@ -11,9 +12,11 @@ use App\Http\Controllers\AdminWorkspaceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'home')->name('home');
+Route::get('/', [ActivityDiscoveryController::class, 'index'])->name('home');
 Route::get('/activities', [ActivityDiscoveryController::class, 'index'])->name('activities.index');
 Route::get('/activities/{activity}', [ActivityDiscoveryController::class, 'show'])->whereNumber('activity')->name('activities.show');
+Route::get('/activities/{activity}/branding/{kind}', [ActivityBrandingController::class, 'show'])
+    ->whereNumber('activity')->whereIn('kind', ['logo', 'background'])->name('activities.branding');
 Route::get('/health', fn () => response()->json(['app' => 'gotry', 'runtime' => 'laravel', 'status' => 'ok']));
 Route::middleware('guest')->group(function (): void {
     Route::view('/account', 'auth.account', ['mode' => 'login'])->name('login');
@@ -53,6 +56,8 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/provider/submit', [ProviderActivityController::class, 'submit'])->block(10, 10)->name('provider.submit');
         Route::post('/provider/activities/{activity}/offer', [ProviderActivityController::class, 'offer'])->whereNumber('activity')->middleware('throttle:interest-writes')->block(10, 10)->name('provider.offer');
         Route::post('/provider/activities/{activity}/reschedule', [ProviderActivityController::class, 'reschedule'])->whereNumber('activity')->middleware('throttle:interest-writes')->block(10, 10)->name('provider.reschedule');
+        Route::post('/provider/activities/{activity}/branding', [ActivityBrandingController::class, 'update'])
+            ->whereNumber('activity')->middleware('throttle:interest-writes')->name('provider.branding');
         Route::get('/provider/activities/{activity}', [ProviderActivityController::class, 'show'])->whereNumber('activity')->name('provider.activity');
     });
     Route::middleware('role:admin')->group(function (): void {

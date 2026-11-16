@@ -64,7 +64,7 @@ class NotificationOutbox
             'reject' => ['activity_rejected', 'Activity rejected', 'Your activity listing was rejected. Open your provider dashboard to review the feedback.'],
             'confirm_minimum' => ['trial_proceeding','Trial proceeding','Minimum interest has been reached. No payment has been collected and this is not proof of a paid booking.'],
             'cancel_low_numbers' => ['trial_cancelled','Trial cancelled','The trial did not reach its required minimum and has been cancelled.'],
-            'cancel_admin' => ['trial_cancelled','Trial cancelled','An administrator has cancelled this trial. No payment was collected by GoTry.'],
+            'cancel_admin' => ['trial_cancelled','Trial cancelled','An administrator has cancelled this trial. Check My List for your registration and payment history.'],
             'rescheduled' => ['trial_rescheduled', 'Trial rescheduled', 'The trial session time changed. Existing interest registrations stay with this session.'],
             'minimum_lost' => ['trial_review','Trial requires review','Interest is below the required minimum. The trial has returned to registration review.'],
             default => throw new LogicException('Unsupported activity notification event.'),

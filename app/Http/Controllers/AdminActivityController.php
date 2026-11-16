@@ -30,6 +30,9 @@ class AdminActivityController
     public function show(Activity $activity, ActivityDraft $schema, ProgrammePricing $pricing, ProviderActivityController $provider, ParentInterests $interests)
     {
         return view('admin.review', ['activity' => $activity, 'sessions' => $interests->sessionSummary($activity), 'review' => $provider->review($schema, $activity->details), 'prices' => $pricing->preview($activity->details),
+            'paidCount' => DB::table('trial_payments')->join('interests', 'interests.id', '=', 'trial_payments.interest_id')
+                ->where('interests.activity_id', $activity->id)->whereNotNull('trial_payments.paid_at')->count(),
+            'waitingCount' => Interest::where('activity_id', $activity->id)->where('status', 'waitlisted')->count(),
             'interestCount'=>Interest::where('activity_id',$activity->id)->where('status','interested')->count()]);
     }
 

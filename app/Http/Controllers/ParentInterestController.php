@@ -12,7 +12,7 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class ParentInterestController
 {
-    public function index(Request $request, ParentInterests $service)
+    public function index(Request $request, ParentInterests $service, NotificationController $inbox, \App\Services\NotificationOutbox $outbox)
     {
         $activityFilter = filter_var($request->query('activity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         $interests = Interest::where('parent_id', $request->user()->id)
@@ -35,16 +35,24 @@ class ParentInterestController
         $payments = DB::table('trial_payments')->whereIn('interest_id', $interests->getCollection()->modelKeys())
             ->get(['interest_id', 'attempt', 'paid_at'])->keyBy('interest_id');
 
-        return view('parent.interests', compact('interests', 'availability', 'openSessions', 'activityFilter', 'payments'));
+        return view('parent.interests', [...compact('interests', 'availability', 'openSessions', 'activityFilter', 'payments'), ...$inbox->inbox($request, $outbox)]);
     }
 
     public function store(Request $request, Activity $activity, ParentInterests $service)
     {
         $request->validate(['interest_terms' => ['accepted']]);
+        $input = $request->all();
+        if ($request->hasAny(['child_first_name', 'child_surname'])) {
+            $names = $request->validate([
+                'child_first_name' => ['required', 'string', 'max:39'],
+                'child_surname' => ['required', 'string', 'max:40'],
+            ]);
+            $input['child_name'] = $names['child_first_name'].' '.$names['child_surname'];
+        }
         $request->validate(['waitlist' => ['sometimes', 'in:1']]);
         $waitlist = $request->boolean('waitlist');
         try {
-            $service->register($request->user(), $activity->id, $request->all(), $waitlist);
+            $service->register($request->user(), $activity->id, $input, $waitlist);
         } catch (HttpExceptionInterface $error) {
             if ($error->getStatusCode() !== 409 || ! $request->boolean('return_to_trial') || $request->expectsJson()) {
                 throw $error;
@@ -52,7 +60,7 @@ class ParentInterestController
 
             return redirect()->to(route('activities.show', $activity).'#trial')
                 ->withErrors(['trial' => $error->getMessage()])
-                ->withInput($request->only(['child_name', 'child_age', 'trial_session']));
+                ->withInput($request->only(['child_name', 'child_first_name', 'child_surname', 'child_age', 'trial_session']));
         }
         if ($waitlist) return redirect()->route('parent.dashboard')->with('status', 'Joined the session waitlist.');
         return redirect()->route('parent.dashboard')->with('status', 'Interest registered. This is not a confirmed booking or payment request.');

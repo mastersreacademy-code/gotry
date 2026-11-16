@@ -250,7 +250,7 @@ class TrialScheduleChangesTest extends TestCase
             'expected_activity_version' => 2, 'reschedule_confirm' => 1,
         ])->assertRedirect();
         $this->actingAs($affected)->get('/parent')->assertOk()->assertSee('2026-12-13 15:30');
-        $this->get('/notifications')->assertOk()->assertSee('Trial rescheduled');
+        $this->get('/parent')->assertOk()->assertSee('Trial rescheduled');
         $this->actingAs($this->user('admin'))->post($adminPath.'/lifecycle', [
             'action' => 'cancel_admin', 'reason' => 'Private cancellation reason',
             'expected_version' => 3, 'trial_session' => 1,
@@ -261,10 +261,10 @@ class TrialScheduleChangesTest extends TestCase
         $this->get('/notifications')->assertOk()->assertSee('Trial cancelled')->assertSee('Trial rescheduled')
             ->assertSee($providerPath.'#trial-management');
         $this->actingAs($affected)->get('/parent')->assertOk()->assertSee('Trial cancelled')
-            ->assertDontSee('Interest registered')->assertHeader('X-Robots-Tag', 'noindex, nofollow');
-        $this->get('/notifications')->assertOk()->assertSee('Trial cancelled')->assertDontSee('Private cancellation reason');
+            ->assertDontSee('>Interest registered</span>', false)->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        $this->get('/parent')->assertOk()->assertSee('Trial cancelled')->assertDontSee('Private cancellation reason');
         $this->actingAs($unaffected)->get('/parent')->assertOk()->assertSee('Interest registered')->assertDontSee('Trial cancelled');
-        $this->get('/notifications')->assertOk()->assertDontSee('Trial cancelled')->assertDontSee('Trial rescheduled');
+        $this->get('/parent')->assertOk()->assertDontSee('Trial cancelled')->assertDontSee('Trial rescheduled');
     }
 
     public function test_reschedule_rolls_back_time_version_and_audit_if_notice_fails(): void
@@ -454,8 +454,8 @@ class TrialScheduleChangesTest extends TestCase
         $service->change($holder, $seat->id, 'withdraw', ['expected_version' => 1]);
         $this->artisan('gotry:process-waitlists')->assertSuccessful();
 
-        $this->actingAs($second)->get('/notifications')->assertOk()->assertDontSee('Review seat offer');
-        $this->actingAs($first)->get('/notifications')->assertOk()->assertSee('Review seat offer')
+        $this->actingAs($second)->get('/parent')->assertOk()->assertDontSee('Review seat offer');
+        $this->actingAs($first)->get('/parent')->assertOk()->assertSee('Review seat offer')
             ->assertSee('href="'.route('parent.dashboard', ['activity' => $this->activity->id]).'"', false);
         $this->get('/parent?activity='.$this->activity->id)->assertOk()->assertSee('Accept seat offer')->assertSee('All registrations');
         $this->get('/parent?activity=999999')->assertOk()->assertSee('No registrations for this activity')
@@ -466,10 +466,10 @@ class TrialScheduleChangesTest extends TestCase
         ])->assertRedirect('/parent');
         $this->get('/parent')->assertOk()->assertSee('Offer declined')->assertDontSee('Accept seat offer');
         $this->artisan('gotry:process-waitlists')->assertSuccessful();
-        $this->actingAs($second)->get('/notifications')->assertOk()->assertSee('Review seat offer');
+        $this->actingAs($second)->get('/parent')->assertOk()->assertSee('Review seat offer');
         $this->travel(24)->hours();
         $this->artisan('gotry:process-waitlists')->assertSuccessful();
-        $this->get('/notifications')->assertOk()->assertSee('Seat offer expired');
+        $this->get('/parent')->assertOk()->assertSee('Seat offer expired');
         $this->get('/parent')->assertOk()->assertSee('Offer expired')->assertDontSee('Accept seat offer')
             ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
     }
@@ -508,14 +508,14 @@ class TrialScheduleChangesTest extends TestCase
         $this->artisan('gotry:process-waitlists')->assertSuccessful();
         $this->assertSame('withdrawn', $offer->fresh()->status);
         $this->assertSame('waitlisted', $next->fresh()->status);
-        $this->get('/notifications')->assertOk()->assertSee('Seat offer expired')->assertDontSee('Private review reason');
+        $this->get('/parent')->assertOk()->assertSee('Seat offer expired')->assertDontSee('Private review reason');
 
         $this->actingAs($admin)->post($access, [
             'action' => 'activate', 'expected_version' => 2, 'reason' => 'Review complete',
         ])->assertRedirect();
         $this->artisan('gotry:process-waitlists')->assertSuccessful();
         $this->actingAs($second)->get('/activities')->assertOk()->assertSee('Junior Music');
-        $this->get('/notifications')->assertOk()->assertSee('Review seat offer')->assertDontSee('Seat offer expired');
+        $this->get('/parent')->assertOk()->assertSee('Review seat offer')->assertDontSee('Seat offer expired');
         $this->get('/parent')->assertOk()->assertSee('Accept seat offer')->assertDontSee('The provider is currently unavailable');
         $this->post('/parent/interests/'.$next->id.'/waitlist', [
             'decision' => 'accept', 'expected_version' => 2, 'expected_activity_version' => 4,

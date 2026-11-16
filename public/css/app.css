@@ -11,3 +11,9 @@
     .site-header nav > a { display: inline-flex; align-items: center; min-height: 44px; }
     .actions > :is(button, .button) { flex: 1 1 100%; text-align: center; }
 }
+
+.site-header .brand img { display: block; width: 75px; height: auto; }
+.trial-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .75rem; margin-block: 1rem 1.5rem; }
+.trial-metrics > div { padding: .85rem; border: 1px solid #dbe4f3; border-radius: .75rem; background: #f5f8fe; }
+.trial-metrics dt { color: #475575; font-size: .85rem; }
+.trial-metrics dd { margin: .3rem 0 0; font-size: 1.1rem; font-weight: 700; }

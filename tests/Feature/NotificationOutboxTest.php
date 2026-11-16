@@ -67,11 +67,11 @@ class NotificationOutboxTest extends TestCase
     public function test_delivery_read_and_inbox_are_scoped_to_recipient(): void
     {
         [$parent,$provider,$activity] = $this->fixture(); $this->register($parent,$activity);
-        $this->actingAs($parent)->get('/notifications?recipient_id='.$provider->id)->assertOk()->assertSee('Your interest was registered')->assertDontSee('A new interest was registered')->assertHeader('X-Robots-Tag','noindex, nofollow');
+        $this->actingAs($parent)->get('/parent?recipient_id='.$provider->id)->assertOk()->assertSee('Your interest was registered')->assertDontSee('A new interest was registered')->assertHeader('X-Robots-Tag','noindex, nofollow');
         $notice = InboxNotification::firstOrFail();
         $this->assertSame($parent->id,$notice->recipient_id);
         $this->assertSame(1,OutboxMessage::where('recipient_id',$provider->id)->whereNull('delivered_at')->count());
-        $this->post('/notifications/'.$notice->id.'/read')->assertRedirect('/notifications'); $read = $notice->fresh()->read_at;
+        $this->post('/notifications/'.$notice->id.'/read')->assertRedirect('/parent#notifications'); $read = $notice->fresh()->read_at;
         $this->travel(1)->minutes(); $this->post('/notifications/'.$notice->id.'/read')->assertRedirect();
         $this->assertTrue($read->equalTo($notice->fresh()->read_at));
         $this->actingAs($provider)->post('/notifications/'.$notice->id.'/read')->assertNotFound();
@@ -127,7 +127,7 @@ class NotificationOutboxTest extends TestCase
         $this->assertDatabaseCount('notification_outbox',1);
         $message = OutboxMessage::firstOrFail(); $this->assertSame($provider->id,$message->recipient_id);
         $this->assertStringNotContainsString('Private review feedback',$message->message);
-        $this->actingAs($parent)->get('/notifications')->assertOk()->assertDontSee('Activity rejected');
+        $this->actingAs($parent)->get('/parent')->assertOk()->assertDontSee('Activity rejected');
         $activity->refresh()->update(['status'=>'pending_approval','version'=>3]);
         DB::statement("CREATE TRIGGER fail_approval_notice BEFORE INSERT ON notification_outbox BEGIN SELECT RAISE(ABORT,'outbox unavailable'); END");
         $this->actingAs($admin)->post('/admin/activities/'.$activity->id.'/decision',['action'=>'approve','expected_version'=>3])->assertStatus(500);
