@@ -365,7 +365,57 @@
 
 .activity-masthead-actions { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .activity-menu { position: relative; z-index: 3; }
-.activity-menu summary { cursor: pointer; padding: .45rem .75rem; border: 1px solid #dbe4f3; border-radius: .65rem; background: #fff; color: #0b206a; font-weight: 700; }
-.activity-menu nav { position: absolute; inset-inline-end: 0; top: calc(100% + .35rem); display: grid; gap: .25rem; min-width: 10rem; padding: .5rem; border: 1px solid #dbe4f3; border-radius: .75rem; background: #fff; box-shadow: 0 8px 20px rgb(32 66 122 / 18%); }
-.activity-menu nav a { padding: .4rem .55rem; }
-.activity-menu nav form { margin: 0; }
+.activity-menu summary {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    list-style: none;
+    cursor: pointer;
+    padding: .55rem .8rem;
+    border: 1px solid #d4e3f4;
+    border-radius: 999px;
+    background: #fff;
+    color: #0b206a;
+    font-size: .875rem;
+    font-weight: 750;
+}
+.activity-menu summary::-webkit-details-marker { display: none; }
+.activity-menu summary::after {
+    content: "";
+    width: .4rem;
+    height: .4rem;
+    border: solid currentColor;
+    border-width: 0 1.5px 1.5px 0;
+    transform: translateY(-2px) rotate(45deg);
+}
+.activity-menu[open] summary { background: #eaf4ff; border-color: #aacbee; }
+.activity-menu[open] summary::after { transform: translateY(2px) rotate(225deg); }
+.activity-menu summary:hover { background: #f0f7ff; }
+.activity-menu :is(summary, a, button):focus-visible { outline: 2px solid #0066cc; outline-offset: 2px; }
+.activity-menu nav {
+    position: absolute;
+    inset-inline-end: 0;
+    top: calc(100% + .5rem);
+    display: grid;
+    gap: .15rem;
+    width: min(13rem, 75vw);
+    padding: .4rem;
+    border: 1px solid #dbe6f4;
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 4px 8px rgb(16 43 91 / 8%), 0 16px 36px rgb(16 43 91 / 16%);
+}
+.activity-menu nav :is(a, button) {
+    display: block;
+    width: 100%;
+    padding: .65rem .75rem;
+    border-radius: .65rem;
+    color: #172b50;
+    background: transparent;
+    text-align: start;
+    text-decoration: none;
+    font-size: .875rem;
+    font-weight: 650;
+}
+.activity-menu nav :is(a, button):hover { background: #edf5ff; color: #064ca3; }
+.activity-menu nav form { margin: .25rem 0 0; padding-top: .25rem; border-top: 1px solid #e8eef7; }
