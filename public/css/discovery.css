@@ -329,29 +329,37 @@
 .activity-hero-branded .activity-hero-copy { position: relative; z-index: 1; }
 
 @media (min-width: 701px) {
-    main:has(> .activity-page) { max-width: 96rem; }
+    main:has(> .activity-page) { max-width: 94rem; }
+    .activity-page { max-width: 88rem; }
     .activity-page .activity-hero {
         margin-inline: 0;
-        border-radius: 2rem;
+        border-radius: 42% 24% 5% 5% / 9% 12% 6% 6%;
+        background: linear-gradient(120deg, #005bc6 4%, #007bd5 43%, #00a7dc 100%);
     }
-    .activity-page .activity-hero-photo { grid-template-columns: minmax(0, 43fr) minmax(0, 57fr); }
+    .activity-page .activity-hero-photo {
+        grid-template-columns: minmax(0, 45fr) minmax(0, 55fr);
+    }
     .activity-page .activity-hero-photo .activity-hero-copy {
         grid-area: 1 / 1;
         min-width: 0;
         overflow-wrap: anywhere;
-        padding: clamp(1.5rem, 3.5vw, 4rem);
+        padding: clamp(1.5rem, 4vw, 4rem) 0 clamp(3.5rem, 5vw, 5rem) clamp(1.5rem, 4vw, 4rem);
     }
     .activity-page .activity-hero-photo img {
-        grid-area: 1 / 2;
+        grid-area: 1 / 1 / 2 / 3;
         position: static;
+        justify-self: end;
         align-self: center;
-        width: 100%;
+        width: 67%;
         height: auto;
         object-fit: contain;
+        mask-image: linear-gradient(90deg, transparent, #000 31%);
     }
-    .activity-page .activity-hero-photo::after {
-        grid-area: 1 / 2;
-        background: linear-gradient(90deg, #007cda, transparent 24%);
+    .activity-page .activity-hero-photo::after { content: none; }
+    .activity-page .activity-overview {
+        margin: -2rem clamp(.5rem, 2vw, 1.5rem) 1rem;
+        border-radius: 1.6rem;
+        box-shadow: 0 8px 18px rgb(32 66 122 / 14%);
     }
-    .activity-page .activity-overview { margin-top: 1rem; }
+    .activity-page .discovery-detail > .panel { margin-top: 0; }
 }
