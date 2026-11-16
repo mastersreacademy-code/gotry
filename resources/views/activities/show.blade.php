@@ -9,9 +9,7 @@
         $openSessions = array_filter($sessions, fn ($session) => $session['open'] || $session['can_waitlist']);
         $canRegister = $sessions === [] ? $availability['open'] : collect($openSessions)->contains('open', true);
         $canWaitlist = collect($openSessions)->contains('can_waitlist', true);
-    @endphp
-    @php($soccer = $category === 'Sports & Fitness' && \Illuminate\Support\Str::contains(\Illuminate\Support\Str::lower($title), 'soccer'))
-    @php
+        $soccer = $category === 'Sports & Fitness' && \Illuminate\Support\Str::contains(\Illuminate\Support\Str::lower($title), 'soccer');
         $branding = \Illuminate\Support\Facades\Storage::disk('local');
         $logo = $branding->exists("activity-branding/{$activityId}/logo");
         $background = $branding->exists("activity-branding/{$activityId}/background");
