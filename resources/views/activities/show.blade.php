@@ -9,7 +9,12 @@
         $openSessions = array_filter($sessions, fn ($session) => $session['open'] || $session['can_waitlist']);
         $canRegister = $sessions === [] ? $availability['open'] : collect($openSessions)->contains('open', true);
         $canWaitlist = collect($openSessions)->contains('can_waitlist', true);
-        $soccer = $category === 'Sports & Fitness' && \Illuminate\Support\Str::contains(\Illuminate\Support\Str::lower($title), 'soccer');
+        $defaultPhoto = match (true) {
+            $category === 'Music' => 'music-trial.webp',
+            $category === 'Sports & Fitness' && preg_match('/\bswim(?:ming)?\b/i', $title) => 'swimming-trial.webp',
+            $category === 'Sports & Fitness' && preg_match('/\b(?:soccer|football)\b/i', $title) => 'soccer-trial.webp',
+            default => null,
+        };
         $branding = \Illuminate\Support\Facades\Storage::disk('local');
         $logo = $branding->exists("activity-branding/{$activityId}/logo");
         $background = $branding->exists("activity-branding/{$activityId}/background");
@@ -19,7 +24,7 @@
         <div class="activity-organiser"><strong>{{ $details['business_name'] ?? $title }}</strong><small>{{ $category }}</small></div>
         <span class="discovery-badge {{ $canRegister ? 'discovery-badge-open' : ($canWaitlist ? 'discovery-badge-wait' : '') }}">{{ $canRegister ? 'Interest open' : ($canWaitlist ? 'Waitlist open' : 'Trial closed') }}</span>
     </div>
-    <section @class(['activity-hero', 'activity-hero-photo' => $soccer && ! $background, 'activity-hero-branded' => $background])>
+    <section @class(['activity-hero', 'activity-hero-photo' => $defaultPhoto && ! $background, 'activity-hero-branded' => $background])>
         <div class="activity-hero-copy">
             <p class="activity-category">Try before you enrol</p>
             <h1>{{ $title }}</h1>
@@ -27,8 +32,8 @@
         </div>
         @if($background)
             <img src="{{ route('activities.branding', [$activityId, 'background']) }}" alt="" fetchpriority="high">
-        @elseif($soccer)
-            <img src="{{ asset('images/soccer-trial.webp') }}" alt="" width="1200" height="800" fetchpriority="high">
+        @elseif($defaultPhoto)
+            <img src="{{ asset('images/'.$defaultPhoto) }}" alt="" fetchpriority="high">
         @endif
     </section>
     <section class="panel activity-overview">
