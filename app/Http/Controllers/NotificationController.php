@@ -11,12 +11,21 @@ class NotificationController
 {
     public function index(Request $request, NotificationOutbox $outbox)
     {
+        if ($request->user()->role === 'parent') {
+            return redirect()->to(route('parent.dashboard').'#notifications');
+        }
+
+        return view('notifications.index', $this->inbox($request, $outbox));
+    }
+
+    public function inbox(Request $request, NotificationOutbox $outbox): array
+    {
         $recipient = $request->user();
         $outbox->deliver($recipient);
-        $notifications = InboxNotification::where('recipient_id', $recipient->id)->orderByDesc('created_at')->orderByDesc('id')->paginate(20);
+        $notifications = InboxNotification::where('recipient_id', $recipient->id)->orderByDesc('created_at')->orderByDesc('id')->paginate(20, pageName: 'inbox_page');
         $unread = InboxNotification::where('recipient_id', $recipient->id)->whereNull('read_at')->count();
         $pending = OutboxMessage::where('recipient_id', $recipient->id)->whereNull('delivered_at')->count();
-        return view('notifications.index', compact('notifications', 'unread', 'pending'));
+        return compact('notifications', 'unread', 'pending');
     }
 
     public function read(Request $request, InboxNotification $notification)
@@ -24,6 +33,6 @@ class NotificationController
         abort_unless($notification->recipient_id === $request->user()->id, 404);
         InboxNotification::whereKey($notification->id)->where('recipient_id', $request->user()->id)
             ->whereNull('read_at')->update(['read_at' => now()]);
-        return redirect()->route('notifications.index');
+        return redirect()->to($request->user()->role === 'parent' ? route('parent.dashboard').'#notifications' : route('notifications.index'));
     }
 }

@@ -140,3 +140,63 @@ Artisan::command('gotry:seed-demo-activities {provider : Email of an existing ac
     $this->table(['ID', 'Activity', 'Status', 'Result'], $results);
     return Command::SUCCESS;
 })->purpose('Create three sample activities for an existing provider');
+
+Artisan::command('gotry:seed-demo-payment {parent} {provider} {admin} {run=first}', function (
+    \App\Services\ParentInterests $registrations,
+    \App\Services\AdminActivityLifecycle $lifecycle,
+): int {
+    $accounts = [];
+    foreach (['parent', 'provider', 'admin'] as $role) {
+        $accounts[$role] = User::where('email', mb_strtolower(trim($this->argument($role))))
+            ->where('role', $role)->where('is_active', true)->first();
+        if ($accounts[$role] === null) {
+            $this->error("Use the email of an existing active {$role}.");
+            return Command::FAILURE;
+        }
+    }
+    $run = $this->argument('run');
+    if (! preg_match('/\A[a-z0-9-]{1,24}\z/', $run)) {
+        $this->error('Use 1 to 24 lowercase letters, numbers or hyphens for the run name.');
+        return Command::FAILURE;
+    }
+
+    $activity = DB::transaction(function () use ($accounts, $run, $registrations, $lifecycle) {
+        ['parent' => $parent, 'provider' => $provider, 'admin' => $admin] = $accounts;
+        $date = \Carbon\CarbonImmutable::today('Australia/Sydney')->addWeeks(2);
+        $token = \Ramsey\Uuid\Uuid::uuid5(\Ramsey\Uuid\Uuid::NAMESPACE_URL,
+            "gotry:demo-payment:{$parent->id}:{$provider->id}:{$run}")->toString();
+        $activity = \App\Models\Activity::firstOrCreate(['submission_token' => $token], [
+            'provider_id' => $provider->id,
+            'title' => "Demo: Soccer Sandbox Checkout ({$run})",
+            'category' => 'Sports & Fitness',
+            'status' => 'pending_registrations',
+            'version' => 1,
+            'submitted_at' => now(),
+            'reviewed_at' => now(),
+            'details' => [
+                'business_name' => 'GoTry Demo Activities', 'description' => 'Sample trial for PayPal Sandbox checkout.',
+                'venue' => 'North Sydney (demo venue)', 'min_age' => 6, 'max_age' => 12,
+                'trial_type' => 'group', 'trial_date' => $date->toDateString(), 'trial_time' => '09:00',
+                'trial_duration' => 45, 'deadline' => $date->subDays(2)->toDateString(), 'trial_min' => 1, 'trial_max' => 6,
+                'regular_format' => 'individual', 'usual_availability' => 'Weekdays after school',
+                'individual_price' => '45', 'discount_type' => 'none',
+            ],
+        ]);
+        if (! $activity->wasRecentlyCreated) {
+            return $activity;
+        }
+
+        $registrations->register($parent, $activity->id, [
+            'child_name' => 'Demo Child', 'child_age' => 8, 'expected_activity_version' => $activity->version,
+        ]);
+
+        return $lifecycle->change($admin, $activity->id, [
+            'action' => 'confirm_minimum', 'expected_version' => $activity->version,
+            'reason' => 'PayPal Sandbox demo fixture.',
+        ]);
+    }, 5);
+
+    $this->info($activity->title.' · '.$activity->statusLabel());
+    $this->line(route('parent.dashboard', ['activity' => $activity->id]));
+    return Command::SUCCESS;
+})->purpose('Prepare a sample PayPal Sandbox registration for existing GoTry test accounts');

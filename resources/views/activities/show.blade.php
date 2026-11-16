@@ -11,18 +11,25 @@
         $canWaitlist = collect($openSessions)->contains('can_waitlist', true);
     @endphp
     @php($soccer = $category === 'Sports & Fitness' && \Illuminate\Support\Str::contains(\Illuminate\Support\Str::lower($title), 'soccer'))
+    @php
+        $branding = \Illuminate\Support\Facades\Storage::disk('local');
+        $logo = $branding->exists("activity-branding/{$activityId}/logo");
+        $background = $branding->exists("activity-branding/{$activityId}/background");
+    @endphp
     <div class="activity-masthead">
-        <a class="activity-wordmark" href="{{ route('home') }}"><img src="{{ asset('images/gotry-activity-logo.webp') }}" alt="GoTry home" width="146" height="97"></a>
+        <a class="activity-wordmark" href="{{ route('home') }}"><img src="{{ $logo ? route('activities.branding', [$activityId, 'logo']) : asset('images/gotry-activity-logo.webp') }}" alt="GoTry home" width="146" height="97"></a>
         <div class="activity-organiser"><strong>{{ $details['business_name'] ?? $title }}</strong><small>{{ $category }}</small></div>
         <span class="discovery-badge {{ $canRegister ? 'discovery-badge-open' : ($canWaitlist ? 'discovery-badge-wait' : '') }}">{{ $canRegister ? 'Interest open' : ($canWaitlist ? 'Waitlist open' : 'Trial closed') }}</span>
     </div>
-    <section @class(['activity-hero', 'activity-hero-photo' => $soccer])>
+    <section @class(['activity-hero', 'activity-hero-photo' => $soccer && ! $background, 'activity-hero-branded' => $background])>
         <div class="activity-hero-copy">
             <p class="activity-category">Try before you enrol</p>
             <h1>{{ $title }}</h1>
             <p class="activity-description preserve-lines">{{ $details['description'] }}</p>
         </div>
-        @if($soccer)
+        @if($background)
+            <img src="{{ route('activities.branding', [$activityId, 'background']) }}" alt="" fetchpriority="high">
+        @elseif($soccer)
             <img src="{{ asset('images/soccer-trial.webp') }}" alt="" width="1200" height="800" fetchpriority="high">
         @endif
     </section>
@@ -130,7 +137,7 @@
     @endif
     <section class="panel discovery-trial activity-registration" id="trial">
         <h2>{{ $canRegister ? 'Register interest for the trial' : ($canWaitlist ? 'Join the trial waitlist' : 'Trial availability') }}</h2>
-        @if($mine->isNotEmpty())<p>Your registrations: @foreach($mine as $interest){{ $interest->child_name }} ({{ $interest->status }})@unless($loop->last), @endunless @endforeach. <a href="{{ route('parent.dashboard') }}">Manage on your dashboard</a>.</p>@endif
+        @if($mine->isNotEmpty())<p>Your registrations: @foreach($mine as $interest){{ $interest->child_name }} ({{ $interest->status }})@unless($loop->last), @endunless @endforeach. <a href="{{ route('parent.dashboard') }}">Manage in My List</a>.</p>@endif
         @if($errors->any())<div class="error" role="alert">{{ $errors->first() }}</div>@endif
         @if(!$canRegister && !$canWaitlist)
             <p class="notice">{{ $sessions !== [] ? 'No trial sessions are accepting interest.' : $availability['reason'] }}</p>
@@ -148,7 +155,8 @@
                     </select>
                 @endif
                 <div class="fields">
-                    <div><label for="child_name">Child's first name or nickname</label><input id="child_name" name="child_name" maxlength="80" value="{{ old('child_name') }}" required autocomplete="off"></div>
+                    <div><label for="child_first_name">Child’s first name</label><input id="child_first_name" name="child_first_name" maxlength="39" value="{{ old('child_first_name') }}" required autocomplete="off"></div>
+                    <div><label for="child_surname">Child’s surname</label><input id="child_surname" name="child_surname" maxlength="40" value="{{ old('child_surname') }}" required autocomplete="off"></div>
                     <div><label for="child_age">Child's age</label><input id="child_age" name="child_age" type="number" min="{{ $details['min_age'] }}" max="{{ $details['max_age'] }}" value="{{ old('child_age') }}" required></div>
                 </div>
                 <label class="check-row"><input type="checkbox" name="interest_terms" value="1" required> I have reviewed the activity details. I understand this is free interest registration, not a confirmed booking or payment.</label>

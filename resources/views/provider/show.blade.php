@@ -14,6 +14,16 @@
     </div>
     @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
     @if($activity->review_reason)<p class="notice"><strong>Admin feedback:</strong> {{ $activity->review_reason }}</p>@endif
+    <section class="panel">
+        <h2>Activity images</h2>
+        <form method="post" enctype="multipart/form-data" action="{{ route('provider.branding', $activity) }}">@csrf
+            <label for="branding-logo">Provider logo (up to 2 MB)</label>
+            <input id="branding-logo" name="logo" type="file" accept="image/jpeg,image/png,image/webp">
+            <label for="branding-background">Activity background (up to 5 MB)</label>
+            <input id="branding-background" name="background" type="file" accept="image/jpeg,image/png,image/webp">
+            <button type="submit">Save images</button>
+        </form>
+    </section>
     <div class="panel provider-management" id="trial-management">
     @if($singleTrialInterest !== null)
         <section class="review-section">

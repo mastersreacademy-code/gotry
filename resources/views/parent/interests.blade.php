@@ -1,5 +1,5 @@
 @extends('layouts.app')
-@section('title', 'Your registrations · GoTry')
+@section('title', 'My List · GoTry')
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/parent.css') }}">
 @endpush
@@ -7,8 +7,7 @@
 <div class="parent-ui">
 <section class="parent-banner">
     <div>
-        <p class="eyebrow">Parent dashboard</p>
-        <h1>Hello, {{ auth()->user()->name }}</h1>
+        <h1>My List</h1>
         <p>Manage your children’s trial registrations, waitlists and seat offers.</p>
     </div>
     <a class="button" href="{{ route('activities.index') }}">Explore activities →</a>
@@ -16,11 +15,28 @@
 <h2 class="parent-list-title">{{ $activityFilter ? 'Registrations for this activity' : 'Your registrations' }}</h2>
 @if($activityFilter)
     <p><a href="{{ route('parent.dashboard') }}">← All registrations</a></p>
+    @if($interests->isEmpty())<p>No registrations for this activity</p>@endif
 @endif
 @if(session('status'))<p class="notice" role="status">{{ session('status') }}</p>@endif
 @if($errors->any())<div class="error" role="alert">{{ $errors->first() }}</div>@endif
+@php
+    $groups = $interests->getCollection()->groupBy(function ($interest) use ($payments) {
+        $activity = $interest->activity;
+        $status = $activity->status === 'pending_registrations'
+            ? \App\Services\TrialSchedule::status($activity, $interest->trial_session)
+            : $activity->status;
+        if ($interest->status === 'withdrawn' || str_starts_with($status, 'cancelled_')) return 'Past registrations';
+        if ($payments->get($interest->id)?->paid_at) return 'Confirmed';
+        return $interest->status === 'interested' && $status === 'proceeding_pending_payments'
+            ? 'Ready for Payment' : 'Registered Interest';
+    });
+@endphp
+@foreach(['Registered Interest', 'Ready for Payment', 'Confirmed', 'Past registrations'] as $group)
+@if($group !== 'Past registrations' || $groups->has($group))
+<section>
+<h3>{{ $group }}</h3>
 <div class="grid">
-@forelse($interests as $interest)
+@forelse($groups->get($group, []) as $interest)
     @php
         $activity = $interest->activity;
         $sessionStart = \App\Services\TrialSchedule::sessions($activity)[$interest->trial_session] ?? null;
@@ -54,15 +70,31 @@
         @if($sessionStart)
             <p>{{ $sessionStart }} (Sydney) · {{ \App\Models\Activity::STATUSES[$sessionStatus] }}</p>
         @elseif(($activity->details['trial_type'] ?? '')==='group')<p>{{ $activity->details['trial_date'] }} · {{ $activity->details['trial_time'] }} (Sydney) · {{ $activity->statusLabel() }}</p>@else<p>{{ $activity->statusLabel() }}</p>@endif
+        @php($payment = $payments->get($interest->id))
+        @if($payment?->paid_at)
+            <p class="notice">Paid · AUD 2.00 · PayPal Sandbox</p>
+        @elseif($interest->status === 'interested' && $sessionStatus === 'proceeding_pending_payments' && $activity->provider?->is_active && config('paypal.client_id') && config('paypal.client_secret'))
+            @if($payment && session('payment_approval') === $payment->attempt)
+                <form method="post" action="{{ route('parent.payment.capture', $interest) }}">@csrf
+                    <input type="hidden" name="attempt" value="{{ $payment->attempt }}">
+                    <button type="submit">Confirm AUD 2.00 Sandbox payment</button>
+                </form>
+            @else
+                <form method="post" action="{{ route('parent.payment.start', $interest) }}">@csrf
+                    <button type="submit">Pay AUD 2.00 with PayPal Sandbox</button>
+                </form>
+            @endif
+        @endif
         @if($interest->status === 'interested')
             <details class="parent-manage" @if($errors->any()) open @endif>
             <summary>Manage registration</summary>
             <form method="post" action="{{ route('parent.withdraw', $interest) }}">@csrf
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">
                 <label class="check-row"><input type="checkbox" name="withdraw_confirm" value="1" required> I want to withdraw this registration.</label>
-                <button class="secondary" type="submit">Withdraw interest</button>
+                @if($payment?->paid_at)<p>The Sandbox payment stays in your history.</p>@endif
+                <button class="secondary" type="submit">Remove from My List</button>
             </form>
-            @if($sessionStart && $destinations !== [] && \App\Services\TrialSchedule::startsAt($sessionStart)->isFuture())
+            @if(! $payment?->paid_at && $sessionStart && $destinations !== [] && \App\Services\TrialSchedule::startsAt($sessionStart)->isFuture())
             <form method="post" action="{{ route('parent.transfer', $interest) }}">@csrf
                 <input type="hidden" name="return_to_dashboard" value="1">
                 <input type="hidden" name="expected_version" value="{{ $interest->version }}">
@@ -102,11 +134,17 @@
     </article>
 @empty
     <article class="parent-empty">
-        <h3>{{ $activityFilter ? 'No registrations for this activity' : 'No registrations yet' }}</h3>
-        <p>Explore activities to find a trial. Registering interest is free and does not confirm a place.</p>
+        <h3>No entries in this category</h3>
     </article>
 @endforelse
 </div>
+</section>
+@endif
+@endforeach
 {{ $interests->links() }}
+<section id="notifications">
+    <h2>Notifications</h2>
+    @include('notifications.list')
+</section>
 </div>
 @endsection

@@ -4,8 +4,14 @@
 @include('admin.nav')
 <section class="panel admin-trial-review">
     <a href="{{ route('admin.activities') }}">← All activities</a>
-    <h1>{{ $activity->title }}</h1><span class="status status-{{ $activity->status }}">{{ $activity->statusLabel() }}</span>
-    <p>Active interests: {{ $interestCount }}@if(($activity->details['trial_type'] ?? '')==='group') · Minimum {{ $activity->details['trial_min'] }} · Maximum {{ $activity->details['trial_max'] }} per trial @endif</p>
+    <h1>{{ $activity->title }}</h1>
+    <dl class="trial-metrics">
+        <div><dt>Minimum to Run</dt><dd>{{ $activity->details['trial_min'] ?? '—' }}</dd></div>
+        <div><dt>Current Interest</dt><dd>{{ $interestCount }}</dd></div>
+        <div><dt>Status</dt><dd>{{ $activity->statusLabel() }}</dd></div>
+        <div><dt>Number Paid</dt><dd>{{ $paidCount }}</dd></div>
+        <div><dt>Waiting List</dt><dd>{{ $waitingCount }}</dd></div>
+    </dl>
     @if(session('status'))<p role="status">{{ session('status') }}</p>@endif
     @if($errors->any())<div class="error" role="alert">{{ $errors->first() }}</div>@endif
     @include('provider.partials.review')

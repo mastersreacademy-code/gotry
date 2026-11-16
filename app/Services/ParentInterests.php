@@ -283,6 +283,8 @@ class ParentInterests
             $interest = Interest::whereKey($snapshot->id)->where('parent_id', $parent->id)->lockForUpdate()->firstOrFail();
             abort_unless($interest->status === 'interested' && $interest->version === (int) $data['expected_version'],
                 409, 'Registration changed. Refresh your dashboard and try again.');
+            abort_if(DB::table('trial_payments')->where('interest_id', $interest->id)->whereNotNull('paid_at')->exists(),
+                409, 'A paid registration cannot move to a different session.');
             $source = $interest->trial_session;
             $destination = (int) $data['trial_session'];
             $sessions = TrialSchedule::sessions($activity);
