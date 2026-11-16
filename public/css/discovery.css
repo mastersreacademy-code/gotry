@@ -419,3 +419,9 @@
 }
 .activity-menu nav :is(a, button):hover { background: #edf5ff; color: #064ca3; }
 .activity-menu nav form { margin: .25rem 0 0; padding-top: .25rem; border-top: 1px solid #e8eef7; }
+
+.activity-masthead > .activity-masthead-actions { flex: 0 0 auto; margin-inline-start: auto; justify-content: flex-end; max-width: 100%; }
+.activity-menu summary { justify-content: center; width: 2.75rem; height: 2.75rem; padding: 0; }
+.activity-menu summary::after { content: none; }
+.activity-menu svg { width: 1.15rem; height: 1.15rem; flex-shrink: 0; }
+.activity-menu nav :is(a, button) { display: flex; align-items: center; gap: .65rem; }

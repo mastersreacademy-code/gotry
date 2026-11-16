@@ -26,8 +26,14 @@
         <div class="activity-masthead-actions">
         <span class="discovery-badge {{ $canRegister ? 'discovery-badge-open' : ($canWaitlist ? 'discovery-badge-wait' : '') }}">{{ $canRegister ? 'Interest open' : ($canWaitlist ? 'Waitlist open' : 'Trial closed') }}</span>
             <details class="activity-menu">
-                <summary>Menu</summary>
-                @include('layouts.navigation')
+                <summary aria-label="{{ auth()->check() ? 'Account menu' : 'Navigation menu' }}" title="{{ auth()->check() ? 'Account menu' : 'Navigation menu' }}">
+                    @auth
+                        @include('layouts.navigation-icon', ['icon' => 'user'])
+                    @else
+                        @include('layouts.navigation-icon', ['icon' => 'menu'])
+                    @endauth
+                </summary>
+                @include('layouts.navigation', ['showIcons' => true])
             </details>
         </div>
     </div>
