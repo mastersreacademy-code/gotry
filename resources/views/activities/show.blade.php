@@ -174,7 +174,7 @@
                 <select id="child_id" name="child_id" required>
                     <option value="">Select a child</option>
                     @foreach($children as $child)
-                        <option value="{{ $child->id }}" @selected((string) old('child_id') === (string) $child->id)>{{ $child->fullName() }} · Age {{ $child->age }}</option>
+                        <option value="{{ $child->id }}" @selected((string) old('child_id', request()->query('child')) === (string) $child->id)>{{ $child->fullName() }} · Age {{ $child->age }}</option>
                     @endforeach
                 </select>
                 <p><a href="{{ route('parent.children', ['activity' => $activityId]) }}">Add a child to your account</a></p>

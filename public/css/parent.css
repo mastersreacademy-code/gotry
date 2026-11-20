@@ -41,3 +41,34 @@
 @media (max-width: 600px) {
     .parent-card form button { width: 100%; margin-right: 0; }
 }
+
+.children-back { display: inline-block; margin-bottom: 1rem; font-weight: 650; }
+.children-banner { background: linear-gradient(115deg, #e9efff, #f8edfa); }
+.children-banner h1 { font-size: clamp(2rem, 4vw, 3rem); }
+.children-layout { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; gap: clamp(1rem, 3vw, 2rem); margin-top: 2rem; }
+.children-layout h2 { margin: 0 0 1rem; font-size: 1.3rem; }
+.children-count { display: inline-block; padding: .15rem .55rem; border-radius: 999px; background: #e9efff; font-size: .85rem; vertical-align: middle; }
+.children-grid { display: grid; gap: .8rem; }
+.child-profile { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .7rem 1rem; padding: 1.25rem; background: #fff; border: 1px solid #dde5f1; border-radius: 1.2rem; box-shadow: 0 4px 14px rgb(25 50 95 / 4%); }
+.child-avatar { display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 1rem; background: #e4efff; color: #174f97; font-size: 1.4rem; font-weight: 750; text-transform: uppercase; }
+.child-profile:nth-child(3n + 2) .child-avatar { background: #fce8f2; color: #a01d58; }
+.child-profile:nth-child(3n) .child-avatar { background: #e7f5ed; color: #176345; }
+.child-profile h3 { margin: 0 0 .2rem; font-size: 1.1rem; overflow-wrap: anywhere; }
+.child-profile p { margin: 0; color: #53617a; }
+.child-profile-action { grid-column: 2; font-size: .9rem; font-weight: 650; }
+.child-form-panel { padding: clamp(1.2rem, 3vw, 1.8rem); border: 1px solid #dde5f1; border-radius: 1.3rem; background: #fff; scroll-margin-top: 1rem; }
+.child-form-panel form { margin: 0; }
+.child-form-panel label { display: block; margin: .9rem 0 .4rem; font-weight: 650; font-size: .9rem; }
+.child-form-panel input { box-sizing: border-box; width: 100%; min-height: 2.8rem; border-radius: .65rem; }
+.child-name-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .75rem; }
+.child-form-panel button { width: 100%; margin-top: 1.4rem; border-radius: .75rem; min-height: 2.8rem; }
+.children-empty { display: grid; justify-items: center; padding: 2rem 1.25rem; text-align: center; border: 1px dashed #bccce2; border-radius: 1.2rem; }
+.children-empty h3 { margin: 1rem 0 .4rem; }
+.children-empty p { max-width: 28rem; color: #53617a; margin: 0; }
+.children-page :is(a, input, button):focus-visible { outline: 3px solid #246dcc; outline-offset: 3px; }
+@media (max-width: 760px) {
+    .children-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 400px) {
+    .child-name-fields { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
