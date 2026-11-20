@@ -4,15 +4,20 @@
 <link rel="stylesheet" href="{{ asset('css/parent.css') }}">
 @endpush
 @section('content')
-<div class="parent-ui">
-<section class="parent-banner">
+<div class="parent-ui parent-dashboard">
+<section class="parent-banner portal-banner">
     <div>
         <h1>My List</h1>
-        <a href="{{ route('parent.children') }}">My children · Add a child</a>
-        <p>Manage your children’s trial registrations, waitlists and seat offers.</p>
+        <p>Your children’s next experiences, all in one place.</p>
     </div>
-    <a class="button" href="{{ route('activities.index') }}">Explore activities →</a>
+    <div class="portal-actions"><a class="button" href="{{ route('activities.index') }}">Explore activities →</a><a class="button secondary" href="{{ route('parent.children') }}">My children · Add a child</a></div>
 </section>
+<nav class="portal-navigation" aria-label="My List sections">
+    <a href="#registered-interest">Registered Interest</a>
+    <a href="#ready-for-payment">Ready for Payment</a>
+    <a href="#confirmed">Confirmed</a>
+    <a href="#notifications">Notifications</a>
+</nav>
 <h2 class="parent-list-title">{{ $activityFilter ? 'Registrations for this activity' : 'Your registrations' }}</h2>
 @if($activityFilter)
     <p><a href="{{ route('parent.dashboard') }}">← All registrations</a></p>
@@ -34,9 +39,9 @@
 @endphp
 @foreach(['Registered Interest', 'Ready for Payment', 'Confirmed', 'Past registrations'] as $group)
 @if($group !== 'Past registrations' || $groups->has($group))
-<section>
-<h3>{{ $group }}</h3>
-<div class="grid">
+<section class="portal-group" id="{{ \Illuminate\Support\Str::slug($group) }}">
+<div class="portal-group-heading"><h3>{{ $group }}</h3><span>{{ $groups->get($group, collect())->count() }} on this page</span></div>
+<div class="grid portal-registration-grid">
 @forelse($groups->get($group, []) as $interest)
     @php
         $activity = $interest->activity;
@@ -63,7 +68,7 @@
             default => 'Withdrawn',
         } }}</span>
         <h3>@if($activity->status === 'pending_registrations')<a href="{{ route('activities.show', $activity) }}">{{ $activity->title }}</a>@else{{ $activity->title }}@endif</h3>
-        <p>{{ $interest->child_name }} · Age {{ $interest->child_age }}</p>
+        <div class="portal-child"><span class="portal-child-avatar" aria-hidden="true">{{ mb_substr($interest->child_name, 0, 1) }}</span><div><strong>{{ $interest->child_name }}</strong><span>Age {{ $interest->child_age }}</span></div></div>
         @if($sessionStatus === 'pending_registrations' && !$activity->provider?->is_active)
             <p class="notice">The provider is currently unavailable. New registrations and seat-offer acceptance are paused.</p>
         @endif
@@ -139,7 +144,11 @@
     </article>
 @empty
     <article class="parent-empty">
-        <h3>No entries in this category</h3>
+        <p>{{ match($group) {
+            'Ready for Payment' => 'Trials ready for payment will appear here once the minimum interest is reached.',
+            'Confirmed' => 'Your paid trial registrations will appear here.',
+            default => 'No entries in this category',
+        } }}</p>
     </article>
 @endforelse
 </div>
@@ -147,7 +156,7 @@
 @endif
 @endforeach
 {{ $interests->links() }}
-<section id="notifications">
+<section id="notifications" class="portal-notifications">
     <h2>Notifications</h2>
     @include('notifications.list')
 </section>
