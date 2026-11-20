@@ -21,12 +21,14 @@
         <a class="button secondary" href="{{ route('parent.children') }}">My children</a>
     </div>
 </section>
+<div class="portal-workspace">
 <nav class="portal-navigation" aria-label="My List sections">
-    <a href="#registered-interest">Registered Interest</a>
-    <a href="#ready-for-payment">Ready for Payment</a>
-    <a href="#confirmed">Confirmed</a>
-    <a href="#past-registrations">Past registrations</a>
+    <a href="#registered-interest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Registered Interest</span></a>
+    <a href="#ready-for-payment"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h3"/></svg><span>Ready for Payment</span></a>
+    <a href="#confirmed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span>Confirmed</span></a>
+    <a href="#past-registrations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 3-6M3 3v6h6M12 7v5l3 2"/></svg><span>Past registrations</span></a>
 </nav>
+<div class="portal-list-content">
 <h2 class="parent-list-title">{{ $activityFilter ? 'Registrations for this activity' : 'Your registrations' }}</h2>
 @if($activityFilter)
     <p><a href="{{ route('parent.dashboard') }}">← All registrations</a></p>
@@ -164,6 +166,8 @@
 </section>
 @endforeach
 {{ $interests->links() }}
+</div>
+</div>
 </div>
 <script type="module" src="{{ asset('js/parent-tabs.js') }}"></script>
 @endsection

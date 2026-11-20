@@ -217,3 +217,37 @@
     .parent-dashboard .parent-card { padding: 1.15rem; }
     .portal-navigation a { flex-basis: 45%; font-size: .78rem; }
 }
+
+/* Sidebar navigation and compact registration rows */
+.portal-workspace { display: grid; grid-template-columns: 13.5rem minmax(0, 1fr); gap: 1.5rem; align-items: start; margin-top: 1.5rem; }
+.parent-dashboard .portal-workspace .portal-navigation { display: flex; flex-direction: column; position: sticky; top: 1rem; margin: 0; padding: .45rem; gap: .3rem; border-radius: 1rem; background: #edf1f8; }
+.portal-workspace .portal-navigation a { display: flex; flex: 0 0 auto; gap: .65rem; justify-content: flex-start; text-align: start; min-height: 2.9rem; padding: .7rem .75rem; }
+.portal-navigation svg { width: 1.15rem; height: 1.15rem; flex: 0 0 auto; }
+.portal-navigation a span { color: inherit; font: inherit; }
+.portal-list-content { min-width: 0; }
+.parent-dashboard .portal-list-content > .parent-list-title { margin-top: 0; margin-bottom: 1rem; }
+.portal-list-content .portal-registration-grid { grid-template-columns: minmax(0, 1fr); gap: .7rem; }
+.portal-list-content .portal-group { margin-bottom: 1rem; }
+.parent-dashboard .portal-list-content .parent-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(8rem, .55fr); column-gap: 1.25rem; padding: 1rem 1.15rem; border-top-width: 1px; border-inline-start-width: 4px; border-inline-start-color: #89b4ef; border-radius: .9rem; }
+.parent-dashboard [data-stage="ready-for-payment"] .parent-card { border-inline-start-color: #e6b24f; }
+.parent-dashboard [data-stage="confirmed"] .parent-card { border-inline-start-color: #6fbd9d; }
+.parent-dashboard [data-stage="past-registrations"] .parent-card { border-inline-start-color: #bbc5d6; }
+.parent-dashboard .portal-list-content .parent-card-offer { border-inline-start-color: #d66f9e; }
+.portal-list-content .parent-card > * { grid-column: 1 / -1; min-width: 0; }
+.portal-list-content .parent-card > .portal-activity-category { grid-column: 1; margin: 0 0 .35rem; }
+.portal-list-content .parent-card > .status { grid-column: 1; justify-self: start; }
+.parent-dashboard .portal-list-content .parent-card > h3 { grid-column: 1; margin: .6rem 0 .45rem; font-size: 1.1rem; }
+.portal-list-content .parent-card > .portal-child { grid-column: 2; grid-row: 1 / 4; align-self: center; margin: 0; padding: .65rem; background: #f5f8fd; }
+.parent-dashboard .portal-list-content .parent-manage { margin-top: .65rem; padding-top: .6rem; }
+.parent-dashboard .portal-list-content .parent-card > form { margin-block: .6rem 0; }
+.parent-dashboard .portal-list-content .parent-card > p { margin-block: .25rem; }
+.parent-dashboard .portal-list-content .parent-empty { min-height: 5rem; padding: 1rem; }
+@media (max-width: 850px) {
+    .portal-workspace { grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+    .parent-dashboard .portal-workspace .portal-navigation { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .portal-workspace .portal-navigation a { min-width: 0; font-size: .8rem; padding: .6rem; }
+}
+@media (max-width: 500px) {
+    .parent-dashboard .portal-list-content .parent-card { grid-template-columns: minmax(0, 1fr); padding: 1rem; }
+    .portal-list-content .parent-card > .portal-child { grid-column: 1; grid-row: auto; margin-block: .4rem; }
+}
