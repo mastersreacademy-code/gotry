@@ -132,3 +132,88 @@
 @media (max-width: 600px) {
     .portal-actions .portal-bell { order: -1; margin-inline-start: auto; }
 }
+
+/* Parent portal presentation */
+.parent-dashboard {
+    --parent-ink: #16284c;
+    --parent-action: #b51560;
+    padding: clamp(.6rem, 2vw, 1.5rem);
+    border-radius: 1.75rem;
+    background: linear-gradient(155deg, #f5f8ff, #fff9fc 60%, #f7fbff);
+}
+.parent-dashboard .portal-banner {
+    position: relative;
+    padding: clamp(1.5rem, 4vw, 2.75rem);
+    border: 1px solid #e0e7f6;
+    border-radius: 1.5rem;
+    background: radial-gradient(ellipse at 85% 0%, #e0ebff, transparent 60%), linear-gradient(115deg, #fff 15%, #f9eef7);
+    box-shadow: 0 8px 28px rgb(28 56 105 / 5%);
+}
+.portal-banner h1 { font-size: clamp(2.2rem, 5vw, 3.3rem); font-weight: 800; line-height: 1.1; margin-bottom: .65rem; }
+.portal-banner p { font-size: 1rem; line-height: 1.6; color: #5c6b84; }
+.portal-actions { align-items: center; }
+.parent-dashboard .portal-actions > .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.85rem;
+    padding: .65rem 1.1rem;
+    border-radius: 999px;
+    font-weight: 700;
+    box-sizing: border-box;
+    text-decoration: none;
+}
+.parent-dashboard .portal-actions > .button:not(.secondary) {
+    background: linear-gradient(135deg, #ce1d70, #a71053);
+    box-shadow: 0 5px 14px rgb(181 21 96 / 17%);
+}
+.parent-dashboard .portal-actions > .button:not(.secondary):hover { background: #99124d; }
+.parent-dashboard .portal-actions > .secondary:hover { background: #edf3ff; border-color: #b9cce8; }
+.portal-actions .portal-bell { box-shadow: 0 3px 10px rgb(22 40 76 / 5%); border-color: #dbe4f3; }
+.parent-dashboard .portal-navigation {
+    margin: 1.5rem 0 1.75rem;
+    padding: .4rem;
+    border: 1px solid #e1e7f1;
+    background: #edf1f8;
+    border-radius: 1rem;
+    gap: .3rem;
+}
+.portal-navigation a { min-height: 2.6rem; display: flex; justify-content: center; align-items: center; box-sizing: border-box; font-size: .85rem; }
+.parent-dashboard .portal-navigation a[aria-selected="true"] {
+    color: #142c56;
+    background: #fff;
+    box-shadow: 0 2px 8px rgb(22 40 76 / 10%);
+}
+.parent-dashboard .portal-navigation a:hover { background: #f9fbff; }
+.parent-dashboard .parent-list-title { font-size: 1.4rem; letter-spacing: -.03em; color: #16284c; }
+.portal-group-heading { padding: .35rem .2rem; }
+.portal-group-heading h3 { color: #425674; font-size: 1rem; font-weight: 700; }
+.parent-dashboard .parent-card {
+    position: relative;
+    padding: 1.5rem;
+    border-radius: 1.25rem;
+    border: 1px solid #e0e7f2;
+    border-top: 4px solid #89b4ef;
+    box-shadow: 0 6px 22px rgb(30 57 103 / 5%);
+}
+.parent-dashboard [data-stage="ready-for-payment"] .parent-card { border-top-color: #e6b24f; }
+.parent-dashboard [data-stage="confirmed"] .parent-card { border-top-color: #6fbd9d; }
+.parent-dashboard [data-stage="past-registrations"] .parent-card { border-top-color: #bbc5d6; }
+.parent-dashboard .parent-card-offer { border-top-color: #d66f9e; background: #fffafd; }
+.parent-dashboard .parent-card > .portal-activity-category { margin: 0 0 .75rem; font-size: .75rem; color: #687c9a; font-weight: 700; letter-spacing: .035em; }
+.parent-dashboard .parent-card h3 { margin-block: 1rem; font-size: 1.35rem; letter-spacing: -.025em; }
+.portal-child { background: #f5f8fd; border: 0; border-radius: .9rem; padding: .8rem; margin-bottom: 1rem; }
+.portal-child-avatar { background: #e2ebfc; color: #2a5095; border-radius: 50%; }
+.parent-dashboard .parent-card > .notice { border-radius: .75rem; padding: .75rem; }
+.parent-dashboard .parent-manage { border-top-color: #edf0f6; padding-top: .9rem; margin-top: 1rem; }
+.parent-dashboard .parent-manage summary { color: #596b86; font-weight: 600; }
+.parent-dashboard .parent-manage summary:hover { color: #a71053; }
+.parent-dashboard .parent-empty { min-height: 8rem; display: grid; align-items: center; justify-items: center; text-align: center; background: rgb(255 255 255 / 75%); border-color: #d5dfef; }
+.parent-dashboard .parent-empty p { max-width: 30rem; line-height: 1.6; }
+@media (max-width: 600px) {
+    .parent-dashboard { padding: .5rem; border-radius: 1rem; }
+    .parent-dashboard .portal-banner { padding: 1.35rem; }
+    .parent-dashboard .portal-actions > .button { font-size: .85rem; }
+    .parent-dashboard .parent-card { padding: 1.15rem; }
+    .portal-navigation a { flex-basis: 45%; font-size: .78rem; }
+}
