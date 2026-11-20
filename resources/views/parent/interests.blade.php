@@ -8,6 +8,7 @@
 <section class="parent-banner">
     <div>
         <h1>My List</h1>
+        <a href="{{ route('parent.children') }}">My children · Add a child</a>
         <p>Manage your children’s trial registrations, waitlists and seat offers.</p>
     </div>
     <a class="button" href="{{ route('activities.index') }}">Explore activities →</a>

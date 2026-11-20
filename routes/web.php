@@ -37,6 +37,9 @@ Route::middleware('auth')->group(function (): void {
         });
     })->name('dashboard');
     Route::middleware('role:parent')->group(function (): void {
+        Route::get('/parent/children', [\App\Http\Controllers\ParentChildController::class, 'index'])->name('parent.children');
+        Route::post('/parent/children', [\App\Http\Controllers\ParentChildController::class, 'store'])
+            ->middleware('throttle:interest-writes')->name('parent.children.store');
         Route::get('/parent', [ParentInterestController::class, 'index'])->name('parent.dashboard');
         Route::get('/parent/interests/{interest}/payment/return', [ParentPaymentController::class, 'returned'])->whereNumber('interest')->name('parent.payment.return');
         Route::post('/parent/interests/{interest}/payment', [ParentPaymentController::class, 'start'])->whereNumber('interest')->middleware('throttle:interest-writes')->name('parent.payment.start');

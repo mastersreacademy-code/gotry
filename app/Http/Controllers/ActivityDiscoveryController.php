@@ -49,6 +49,9 @@ class ActivityDiscoveryController
             $sessions[$number] = ['start' => $start, ...$interests->availability($activity, session: $number)];
         }
         return view('activities.show', ['title' => $activity->title, 'category' => $activity->category,
+            'children' => $request->user()?->role === 'parent'
+                ? \App\Models\Child::where('parent_id', $request->user()->id)->orderBy('first_name')->get()
+                : collect(),
             'activityId' => $activity->id, 'activityVersion' => $activity->version, 'mine' => $mine,
             'sessions' => $sessions, 'availability' => $interests->availability($activity), 'details' => $details, 'prices' => $pricing->preview($activity->details)]);
     }

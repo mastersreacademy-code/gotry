@@ -170,11 +170,14 @@
                         @endforeach
                     </select>
                 @endif
-                <div class="fields">
-                    <div><label for="child_first_name">Child’s first name</label><input id="child_first_name" name="child_first_name" maxlength="39" value="{{ old('child_first_name') }}" required autocomplete="off"></div>
-                    <div><label for="child_surname">Child’s surname</label><input id="child_surname" name="child_surname" maxlength="40" value="{{ old('child_surname') }}" required autocomplete="off"></div>
-                    <div><label for="child_age">Child's age</label><input id="child_age" name="child_age" type="number" min="{{ $details['min_age'] }}" max="{{ $details['max_age'] }}" value="{{ old('child_age') }}" required></div>
-                </div>
+                <label for="child_id">Which child is this activity for?</label>
+                <select id="child_id" name="child_id" required>
+                    <option value="">Select a child</option>
+                    @foreach($children as $child)
+                        <option value="{{ $child->id }}" @selected((string) old('child_id') === (string) $child->id)>{{ $child->fullName() }} · Age {{ $child->age }}</option>
+                    @endforeach
+                </select>
+                <p><a href="{{ route('parent.children', ['activity' => $activityId]) }}">Add a child to your account</a></p>
                 <label class="check-row"><input type="checkbox" name="interest_terms" value="1" required> I have reviewed the activity details. I understand this is free interest registration, not a confirmed booking or payment.</label>
                 @if($canRegister)
                     <button type="submit" data-intent="register">Register interest →</button>

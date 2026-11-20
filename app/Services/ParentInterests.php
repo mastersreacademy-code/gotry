@@ -147,11 +147,18 @@ class ParentInterests
     public function register(User $parent, int $activityId, array $input, bool $waitlist = false): Interest
     {
         $this->assertParent($parent);
+        $child = null;
+        if (isset($input['child_id'])) {
+            $selection = Validator::make($input, ['child_id' => ['required', 'integer', 'min:1']])->validate();
+            $child = \App\Models\Child::where('parent_id', $parent->id)->findOrFail($selection['child_id']);
+            $input['child_name'] = $child->fullName();
+            $input['child_age'] = $child->age;
+        }
         if (is_string($input['child_name'] ?? null)) $input['child_name'] = Str::squish($input['child_name']);
         $data = Validator::make($input, ['child_name' => ['required','string','max:80'], 'child_age' => ['required','integer','between:1,18'],
             'expected_activity_version' => ['required','integer','min:1'], 'trial_session' => ['nullable','integer','between:1,10']])->validate();
-        $key = hash('sha256', mb_strtolower($data['child_name']));
-        return DB::transaction(function () use ($parent, $activityId, $data, $key, $waitlist) {
+        $key = $child?->registration_key ?? hash('sha256', mb_strtolower($data['child_name']));
+        return DB::transaction(function () use ($parent, $activityId, $data, $key, $waitlist, $child) {
             $activity = $this->lockActivity($activityId);
             $session = isset($data['trial_session']) ? (int) $data['trial_session'] : null;
             $existing = Interest::where('activity_id', $activity->id)->where('parent_id', $parent->id)->where('child_key', $key)->lockForUpdate()->first();
@@ -170,7 +177,7 @@ class ParentInterests
                 $this->assertAccepting($activity, (int) $data['expected_activity_version'], (int) $data['child_age'], $session);
             }
             $interest = Interest::create(['activity_id' => $activity->id, 'trial_session' => $session, 'parent_id' => $parent->id, 'child_name' => $data['child_name'],
-                'child_key' => $key, 'child_age' => $data['child_age'], 'status' => $waitlist ? 'waitlisted' : 'interested', 'version' => 1, 'activity_version' => $activity->version]);
+                'child_id' => $child?->id, 'child_key' => $key, 'child_age' => $data['child_age'], 'status' => $waitlist ? 'waitlisted' : 'interested', 'version' => 1, 'activity_version' => $activity->version]);
             $this->record($interest, $parent, $waitlist ? 'waitlisted' : 'registered', null, $activity);
             return $interest;
         }, 5);
