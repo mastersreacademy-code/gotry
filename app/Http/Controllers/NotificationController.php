@@ -11,10 +11,6 @@ class NotificationController
 {
     public function index(Request $request, NotificationOutbox $outbox)
     {
-        if ($request->user()->role === 'parent') {
-            return redirect()->to(route('parent.dashboard').'#notifications');
-        }
-
         return view('notifications.index', $this->inbox($request, $outbox));
     }
 
@@ -33,6 +29,6 @@ class NotificationController
         abort_unless($notification->recipient_id === $request->user()->id, 404);
         InboxNotification::whereKey($notification->id)->where('recipient_id', $request->user()->id)
             ->whereNull('read_at')->update(['read_at' => now()]);
-        return redirect()->to($request->user()->role === 'parent' ? route('parent.dashboard').'#notifications' : route('notifications.index'));
+        return redirect()->route('notifications.index');
     }
 }
