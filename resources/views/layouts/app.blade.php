@@ -11,10 +11,7 @@
 <body>
 <a class="skip-link" href="#main-content">Skip to content</a>
 @unless (View::hasSection('activity-masthead-navigation'))
-<header class="site-header">
-    <a class="brand" href="{{ route('home') }}"><img src="{{ asset('images/gotry-activity-logo.webp') }}" alt="GoTry" width="75" height="50"></a>
-    @include('layouts.navigation')
-</header>
+@include('layouts.masthead')
 @endunless
 <main id="main-content" tabindex="-1">@yield('content')</main>
 <footer>GoTry · Development preview · No live bookings or payments</footer>

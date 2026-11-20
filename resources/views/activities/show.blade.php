@@ -20,23 +20,13 @@
         $logo = $branding->exists("activity-branding/{$activityId}/logo");
         $background = $branding->exists("activity-branding/{$activityId}/background");
     @endphp
-    <div class="activity-masthead">
-        <a class="activity-wordmark" href="{{ route('home') }}"><img src="{{ $logo ? route('activities.branding', [$activityId, 'logo']) : asset('images/gotry-activity-logo.webp') }}" alt="GoTry home" width="146" height="97"></a>
-        <div class="activity-organiser"><strong>{{ $details['business_name'] ?? $title }}</strong><small>{{ $category }}</small></div>
-        <div class="activity-masthead-actions">
-        <span class="discovery-badge {{ $canRegister ? 'discovery-badge-open' : ($canWaitlist ? 'discovery-badge-wait' : '') }}">{{ $canRegister ? 'Interest open' : ($canWaitlist ? 'Waitlist open' : 'Trial closed') }}</span>
-            <details class="activity-menu">
-                <summary aria-label="{{ auth()->check() ? 'Account menu' : 'Navigation menu' }}" title="{{ auth()->check() ? 'Account menu' : 'Navigation menu' }}">
-                    @auth
-                        @include('layouts.navigation-icon', ['icon' => 'user'])
-                    @else
-                        @include('layouts.navigation-icon', ['icon' => 'menu'])
-                    @endauth
-                </summary>
-                @include('layouts.navigation', ['showIcons' => true])
-            </details>
-        </div>
-    </div>
+    @include('layouts.masthead', [
+        'mastheadTitle' => $details['business_name'] ?? $title,
+        'mastheadSubtitle' => $category,
+        'mastheadLogo' => $logo ? route('activities.branding', [$activityId, 'logo']) : asset('images/gotry-activity-logo.webp'),
+        'mastheadStatus' => $canRegister ? 'Interest open' : ($canWaitlist ? 'Waitlist open' : 'Trial closed'),
+        'mastheadState' => $canRegister ? 'open' : ($canWaitlist ? 'waiting' : 'closed'),
+    ])
     <section @class(['activity-hero', 'activity-hero-photo' => $defaultPhoto && ! $background, 'activity-hero-branded' => $background])>
         <div class="activity-hero-copy">
             <p class="activity-category">Try before you enrol</p>
