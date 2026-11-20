@@ -42,7 +42,7 @@ class ParentInterestController
     {
         $request->validate(['interest_terms' => ['accepted']]);
         $input = $request->all();
-        if ($request->hasAny(['child_first_name', 'child_surname'])) {
+        if (! $request->filled('child_id') && $request->hasAny(['child_first_name', 'child_surname'])) {
             $names = $request->validate([
                 'child_first_name' => ['required', 'string', 'max:39'],
                 'child_surname' => ['required', 'string', 'max:40'],
@@ -60,7 +60,7 @@ class ParentInterestController
 
             return redirect()->to(route('activities.show', $activity).'#trial')
                 ->withErrors(['trial' => $error->getMessage()])
-                ->withInput($request->only(['child_name', 'child_first_name', 'child_surname', 'child_age', 'trial_session']));
+                ->withInput($request->only(['child_id', 'child_name', 'child_first_name', 'child_surname', 'child_age', 'trial_session']));
         }
         if ($waitlist) return redirect()->route('parent.dashboard')->with('status', 'Joined the session waitlist.');
         return redirect()->route('parent.dashboard')->with('status', 'Interest registered. This is not a confirmed booking or payment request.');

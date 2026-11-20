@@ -54,13 +54,45 @@ class ParentInterestTest extends TestCase
         return Interest::where('parent_id', $parent->id)->where('activity_id', $activity->id)->latest('id')->firstOrFail();
     }
 
+    public function test_parent_can_save_children_select_them_and_cannot_use_another_accounts_child(): void
+    {
+        $parent = $this->user();
+        $activity = $this->activity();
+        $this->actingAs($parent)->post('/parent/children', [
+            'first_name' => 'Demo', 'surname' => 'One', 'age' => 8,
+        ])->assertRedirect('/parent/children');
+        $first = \App\Models\Child::where('parent_id', $parent->id)->firstOrFail();
+        $this->post('/parent/children', [
+            'first_name' => 'Demo', 'surname' => 'Two', 'age' => 9,
+        ])->assertRedirect('/parent/children');
+        $second = \App\Models\Child::where('parent_id', $parent->id)->latest('id')->firstOrFail();
+        $this->post('/parent/children', [
+            'first_name' => 'Demo', 'surname' => 'One', 'age' => 8,
+        ])->assertRedirect('/parent/children');
+        $this->assertDatabaseCount('children', 2);
+        $this->get('/activities/'.$activity->id)->assertSee('Demo One')->assertSee('Demo Two');
+        $input = ['child_id' => $first->id, 'interest_terms' => 1, 'expected_activity_version' => $activity->version];
+        $url = '/activities/'.$activity->id.'/interest';
+        $this->post($url, [...$input, 'child_name' => 'Forged', 'child_age' => 1])->assertRedirect('/parent');
+        $this->post($url, $input)->assertRedirect('/parent');
+        $this->post($url, [...$input, 'child_id' => $second->id])->assertRedirect('/parent');
+        $this->assertDatabaseCount('interests', 2);
+        $this->assertDatabaseHas('interests', ['child_id' => $first->id, 'child_name' => 'Demo One', 'child_age' => 8]);
+        $this->actingAs($this->user())->get('/parent/children')->assertDontSee('Demo One');
+        $this->get('/activities/'.$activity->id)->assertDontSee('Demo One');
+        $this->post($url, $input)->assertNotFound();
+        $this->actingAs($this->user('provider'))->post('/parent/children', [
+            'first_name' => 'Private', 'surname' => 'Child', 'age' => 8,
+        ])->assertForbidden();
+    }
+
     public function test_home_lists_activities_and_parent_can_register_with_first_name_and_surname(): void
     {
         $activity = $this->activity();
         $this->get('/')->assertOk()->assertSee('Junior Music')->assertHeader('X-Robots-Tag', 'noindex, nofollow');
         $parent = $this->user();
         $url = '/activities/'.$activity->id;
-        $this->actingAs($parent)->get($url)->assertSee('child_first_name')->assertSee('child_surname');
+        $this->actingAs($parent)->get($url)->assertSee('child_id')->assertSee('Add a child to your account');
         $this->post($url.'/interest', [
             'child_first_name' => 'Demo', 'child_surname' => 'Child', 'child_age' => 8,
             'expected_activity_version' => $activity->version, 'interest_terms' => 1,
