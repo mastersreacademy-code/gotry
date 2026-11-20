@@ -425,3 +425,36 @@
 .activity-menu summary::after { content: none; }
 .activity-menu svg { width: 1.15rem; height: 1.15rem; flex-shrink: 0; }
 .activity-menu nav :is(a, button) { display: flex; align-items: center; gap: .65rem; }
+
+/* Activity directory */
+.discovery-directory { padding: clamp(.5rem, 2vw, 1.5rem); border-radius: 1.75rem; background: linear-gradient(150deg, #f4f8ff, #fff9fc 70%); }
+.discovery-directory .discovery-heading { padding: clamp(1.5rem, 4vw, 3rem); border: 1px solid #e0e7f5; border-radius: 1.5rem; background: radial-gradient(ellipse at 90% 0%, #dceaff, transparent 65%), linear-gradient(110deg, #fff, #f9edf6); box-shadow: 0 6px 24px rgb(28 56 105 / 4%); }
+.discovery-directory h1 { font-size: clamp(2rem, 5vw, 3.25rem); line-height: 1.1; max-width: 19ch; margin-bottom: .85rem; }
+.discovery-directory .discovery-heading p { max-width: 40rem; color: #5c6c85; line-height: 1.6; margin-top: 0; }
+.discovery-directory .discovery-filters { padding: 1.15rem; border: 1px solid #e0e6f1; border-radius: 1rem; background: #fff; box-shadow: 0 4px 16px rgb(28 56 105 / 4%); grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto; }
+.discovery-directory .discovery-filters label { font-size: .8rem; font-weight: 650; color: #425674; margin-bottom: .4rem; }
+.discovery-directory .discovery-filters :is(input, select) { box-sizing: border-box; min-width: 0; width: 100%; height: 2.8rem; border: 1px solid #d9e2ef; background: #fafcff; border-radius: .65rem; }
+.discovery-directory .discovery-filters :is(button, .button) { min-height: 2.8rem; border-radius: .7rem; padding: .65rem 1rem; font-size: .9rem; }
+.discovery-directory .discovery-filters > .secondary { grid-column: 1 / -1; justify-self: start; min-height: auto; padding: .25rem 0; background: transparent; }
+.directory-results-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; margin: 1.75rem 0 1rem; }
+.directory-results-heading h2 { margin: 0; font-size: 1.3rem; letter-spacing: -.025em; }
+.directory-results-heading p { margin: 0; font-size: .8rem; color: #75839a; }
+.discovery-directory .discovery-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: 1rem; }
+.discovery-directory .discovery-card { padding: 0; overflow: hidden; border: 1px solid #dfe6f1; border-radius: 1.15rem; background: #fff; box-shadow: 0 5px 18px rgb(25 50 95 / 5%); }
+.directory-card-photo { display: block; width: 100%; height: auto; aspect-ratio: 16 / 8; object-fit: cover; }
+.directory-card-body { padding: 1.15rem; }
+.discovery-directory .discovery-card .eyebrow { color: #6b7d98; font-size: .72rem; font-weight: 700; letter-spacing: .025em; }
+.discovery-directory .discovery-card h2 { font-size: 1.15rem; line-height: 1.35; margin: .6rem 0; letter-spacing: -.02em; }
+.discovery-directory .discovery-card h2 a { text-decoration: none; }
+.discovery-directory .discovery-card h2 a:hover { text-decoration: underline; }
+.directory-card-body > p:not(.eyebrow) { color: #64738b; font-size: .85rem; line-height: 1.6; margin: .5rem 0 .8rem; }
+.discovery-directory .discovery-badge { font-size: .7rem; padding: .3rem .55rem; margin-bottom: .35rem; }
+.directory-card-action { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-top: 1px solid #edf0f6; margin-top: .8rem; padding-top: .8rem; color: #234e87; font-size: .85rem; font-weight: 700; text-decoration: none; }
+.directory-card-action:hover { color: #b51560; }
+.discovery-directory .discovery-empty { padding: 1.5rem; border-style: dashed; }
+.discovery-directory :is(a, input, select, button):focus-visible { outline: 2px solid #427cbd; outline-offset: 3px; }
+@media (max-width: 700px) {
+    .discovery-directory .discovery-filters { grid-template-columns: minmax(0, 1fr); }
+    .directory-results-heading { flex-wrap: wrap; gap: .4rem; }
+    .discovery-directory { padding: .5rem; border-radius: 1rem; }
+}
