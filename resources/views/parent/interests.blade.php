@@ -16,7 +16,10 @@
             @if($unread > 0)
                 <span class="portal-bell-badge" aria-hidden="true">{{ $unread > 99 ? '99+' : $unread }}</span>
             @endif
-        </a><a class="button" href="{{ route('activities.index') }}">Explore activities →</a><a class="button secondary" href="{{ route('parent.children') }}">My children · Add a child</a></div>
+        </a>
+        <a class="button" href="{{ route('activities.index') }}">Explore activities →</a>
+        <a class="button secondary" href="{{ route('parent.children') }}">My children</a>
+    </div>
 </section>
 <nav class="portal-navigation" aria-label="My List sections">
     <a href="#registered-interest">Registered Interest</a>
@@ -44,7 +47,7 @@
     });
 @endphp
 @foreach(['Registered Interest', 'Ready for Payment', 'Confirmed', 'Past registrations'] as $group)
-<section class="portal-group" id="{{ \Illuminate\Support\Str::slug($group) }}">
+<section class="portal-group" id="{{ \Illuminate\Support\Str::slug($group) }}" data-stage="{{ \Illuminate\Support\Str::slug($group) }}">
 <div class="portal-group-heading"><h3>{{ $group }}</h3><span>{{ $groups->get($group, collect())->count() }} on this page</span></div>
 <div class="grid portal-registration-grid">
 @forelse($groups->get($group, []) as $interest)
@@ -62,6 +65,7 @@
         $canAccept = $liveOffer && $slot['accepting_offers'];
     @endphp
     <article @class(['parent-card', 'parent-card-offer' => $canAccept])>
+        <p class="portal-activity-category">{{ $activity->category }}</p>
         <span class="status {{ ($cancelled || ($interest->status === 'offered' && ! $canAccept)) ? 'parent-status-inactive' : 'parent-status-'.$interest->status }}">{{ $cancelled ? 'Trial cancelled' : match($interest->status) {
             'interested' => 'Interest registered', 'waitlisted' => 'On waitlist',
             'offered' => $canAccept ? 'Seat offered' : ($liveOffer ? 'Offer unavailable' : 'Offer expired'),
