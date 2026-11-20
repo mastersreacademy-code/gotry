@@ -29,7 +29,7 @@
     <a href="#past-registrations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 3-6M3 3v6h6M12 7v5l3 2"/></svg><span>Past registrations</span></a>
 </nav>
 <div class="portal-list-content">
-<h2 class="parent-list-title">{{ $activityFilter ? 'Registrations for this activity' : 'Your registrations' }}</h2>
+
 @if($activityFilter)
     <p><a href="{{ route('parent.dashboard') }}">← All registrations</a></p>
     @if($interests->isEmpty())<p>No registrations for this activity</p>@endif
@@ -50,7 +50,7 @@
 @endphp
 @foreach(['Registered Interest', 'Ready for Payment', 'Confirmed', 'Past registrations'] as $group)
 <section class="portal-group" id="{{ \Illuminate\Support\Str::slug($group) }}" data-stage="{{ \Illuminate\Support\Str::slug($group) }}">
-<div class="portal-group-heading"><h3>{{ $group }}</h3><span>{{ $groups->get($group, collect())->count() }} on this page</span></div>
+<div class="portal-group-heading"><h2>{{ $group }}</h2><span>{{ $groups->get($group, collect())->count() }} on this page</span></div>
 <div class="grid portal-registration-grid">
 @forelse($groups->get($group, []) as $interest)
     @php
