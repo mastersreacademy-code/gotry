@@ -88,18 +88,20 @@
         @elseif(!empty($details['class_times']))<p class="preserve-lines">{{ $details['class_times'] }}</p>
         @else<p>{{ $details['regular_day'] }} · {{ $details['regular_time'] }}</p>@endif
         @if(count($prices))
-            <div class="activity-prices">
+            <div class="activity-prices activity-price-options">
                 @foreach($prices as $price)
                     <div class="activity-price">
+                        <div class="activity-price-identity">
                         <h3>{{ $price['label'] }}</h3>
                         @if($price['label'] === 'Standard group' && isset($details['regular_standard'], $details['regular_max']))
                             <small>{{ $details['regular_standard'] }}–{{ $details['regular_max'] }} children</small>
                         @elseif($price['label'] === 'Small group' && isset($details['regular_min'], $details['regular_standard']) && $details['regular_min'] < $details['regular_standard'])
                             <small>{{ $details['regular_min'] }}–{{ $details['regular_standard'] - 1 }} children</small>
                         @endif
-                        <p class="activity-price-amount"><strong>${{ number_format($price['total'] / 100, 2) }}</strong> {{ $price['discount'] > 0 ? strtolower($price['period']) : ($details['regular_format'] === 'group' ? 'per term' : 'per lesson') }}</p>
+                        </div>
+                        <p class="activity-price-amount"><strong>${{ number_format($price['total'] / 100, 2) }}</strong><span class="activity-price-period">{{ $price['discount'] > 0 ? strtolower($price['period']) : ($details['regular_format'] === 'group' ? 'per term' : 'per lesson') }}</span></p>
                         @if($price['discount'] > 0)
-                            <small>Regular price ${{ number_format($price['regular'] / 100, 2) }} · Save ${{ number_format($price['discount'] / 100, 2) }}</small>
+                            <small class="activity-price-savings">Regular price ${{ number_format($price['regular'] / 100, 2) }} · Save ${{ number_format($price['discount'] / 100, 2) }}</small>
                         @endif
                     </div>
                 @endforeach

@@ -459,29 +459,37 @@
     .discovery-directory { padding: .5rem; border-radius: 1rem; }
 }
 
-/* Size prices to their cards, including long currency amounts. */
-.activity-page .activity-prices {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+
+/* Full-width programme price options */
+.activity-page .activity-price-options {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .85rem;
 }
-.activity-page .activity-price {
+.activity-page .activity-price-options .activity-price {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem 1.25rem;
     min-width: 0;
-    container-type: inline-size;
+    padding: 1.25rem;
+    border-radius: 1.1rem;
 }
-.activity-page .activity-price .activity-price-amount strong {
-    max-width: 100%;
-    font-size: 1.5rem;
-    line-height: 1.15;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -.035em;
-    overflow-wrap: anywhere;
-}
-@supports (font-size: 1cqi) {
-    .activity-page .activity-price .activity-price-amount strong {
-        font-size: clamp(1rem, 11cqi, 2.4rem);
-    }
-}
-.activity-page .activity-price small {
+.activity-price-identity { flex: 1 1 9rem; min-width: 0; }
+.activity-price-identity h3 { font-size: 1.1rem; line-height: 1.3; }
+.activity-price-identity small { display: block; margin-top: .35rem; color: #52627b; font-size: .85rem; }
+.activity-page .activity-price-options .activity-price-amount { flex: 0 1 auto; min-width: 0; max-width: 100%; margin: 0; text-align: end; }
+.activity-page .activity-price-options .activity-price-amount strong {
     display: block;
-    max-width: 100%;
+    font-size: 2.25rem;
+    line-height: 1.15;
+    letter-spacing: -.035em;
+    font-variant-numeric: tabular-nums;
     overflow-wrap: anywhere;
+}
+.activity-price-period { display: block; margin-top: .3rem; color: #52627b; font-size: .85rem; }
+.activity-price-savings { flex: 1 1 100%; padding-top: .75rem; border-top: 1px solid rgb(23 39 73 / 10%); color: #52627b; font-size: .8rem; line-height: 1.5; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+    .activity-page .activity-price-options .activity-price-amount { flex-basis: 100%; text-align: start; }
 }
