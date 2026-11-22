@@ -47,3 +47,26 @@
     .gotry-masthead-status { font-size: .7rem; }
     .gotry-masthead-identity > span { font-size: .8rem; }
 }
+
+/* Align the shared masthead and page content to one outer grid. */
+body > .gotry-masthead {
+    width: calc(100% - 2.5rem);
+    max-width: 1040px;
+    margin: 1.25rem auto 0;
+    padding: 1rem 1.25rem;
+}
+body > main {
+    box-sizing: border-box;
+    width: calc(100% - 2.5rem);
+    max-width: 1040px;
+    padding: 0;
+    margin: 1.25rem auto 2.5rem;
+}
+body > .gotry-masthead .gotry-masthead-logo img { width: 5.25rem; }
+body > .gotry-masthead .gotry-masthead-identity strong { font-size: clamp(1.2rem, 2.2vw, 1.6rem); }
+@media (max-width: 600px) {
+    body > .gotry-masthead, body > main { width: calc(100% - 1.5rem); }
+    body > .gotry-masthead { padding: .8rem; margin-top: .75rem; }
+    body > main { margin-top: .85rem; }
+    body > .gotry-masthead .gotry-masthead-logo img { width: 4rem; }
+}
