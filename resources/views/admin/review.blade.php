@@ -1,7 +1,13 @@
 @extends('layouts.app')
 @section('title', 'Review '.$activity->title.' · GoTry')
 @section('content')
+<div class="admin-workspace">
 @include('admin.nav')
+<div class="admin-content">
+@if(session('status'))<p class="notice" role="status">{{ session('status') }}</p>@endif
+@if($errors->any())<div class="error" role="alert">{{ $errors->first() }}</div>@endif
+
+
 <section class="panel admin-trial-review">
     <a href="{{ route('admin.activities') }}">← All activities</a>
     <h1>{{ $activity->title }}</h1>
@@ -47,4 +53,6 @@
         <div class="actions">@if($activity->status==='pending_registrations' && ($activity->details['trial_type'] ?? '')==='group')<button name="action" value="confirm_minimum">Mark proceeding</button><button class="secondary" name="action" value="cancel_low_numbers">Cancel below minimum</button>@endif<button class="secondary" name="action" value="cancel_admin">Cancel as admin</button></div>
     </form>@endif
 </section>
+</div>
+</div>
 @endsection

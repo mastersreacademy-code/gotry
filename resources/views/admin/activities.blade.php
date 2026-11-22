@@ -1,7 +1,13 @@
 @extends('layouts.app')
 @section('title', 'Review activities · GoTry')
 @section('content')
+<div class="admin-workspace">
 @include('admin.nav')
+<div class="admin-content">
+@if(session('status'))<p class="notice" role="status">{{ session('status') }}</p>@endif
+@if($errors->any())<div class="error" role="alert">{{ $errors->first() }}</div>@endif
+
+
 <h1>Activity reviews</h1>
 <form method="get" class="admin-filters"><label>Activity title<input name="q" value="{{ request('q') }}" maxlength="160"></label><label>Status<select name="status"><option value="">All statuses</option>@foreach(\App\Models\Activity::STATUSES as $value=>$label)<option value="{{ $value }}" @selected(request('status')===$value)>{{ $label }}</option>@endforeach</select></label><button>Filter</button><a href="{{ route('admin.activities') }}">Clear</a></form>
 <ul class="admin-records">
@@ -21,4 +27,6 @@
 @endforelse
 </ul>
 {{ $activities->links() }}
+</div>
+</div>
 @endsection
