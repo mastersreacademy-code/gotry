@@ -458,3 +458,30 @@
     .directory-results-heading { flex-wrap: wrap; gap: .4rem; }
     .discovery-directory { padding: .5rem; border-radius: 1rem; }
 }
+
+/* Size prices to their cards, including long currency amounts. */
+.activity-page .activity-prices {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+}
+.activity-page .activity-price {
+    min-width: 0;
+    container-type: inline-size;
+}
+.activity-page .activity-price .activity-price-amount strong {
+    max-width: 100%;
+    font-size: 1.5rem;
+    line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -.035em;
+    overflow-wrap: anywhere;
+}
+@supports (font-size: 1cqi) {
+    .activity-page .activity-price .activity-price-amount strong {
+        font-size: clamp(1rem, 11cqi, 2.4rem);
+    }
+}
+.activity-page .activity-price small {
+    display: block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
