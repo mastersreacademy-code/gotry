@@ -493,3 +493,20 @@
 @media (max-width: 600px) {
     .activity-page .activity-price-options .activity-price-amount { flex-basis: 100%; text-align: start; }
 }
+
+/* The directory uses the page grid without another inset panel. */
+.discovery-ui.discovery-directory {
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+}
+.discovery-directory .discovery-heading {
+    padding: clamp(1.25rem, 3vw, 2rem);
+    border-radius: 1.25rem;
+    margin-bottom: 1rem;
+}
+.discovery-directory .discovery-heading h1 {
+    max-width: none;
+    font-size: clamp(1.9rem, 4vw, 2.75rem);
+}
+.discovery-directory .directory-results-heading { margin-top: 1.5rem; }
