@@ -1,7 +1,13 @@
 @extends('layouts.app')
 @section('title','Accounts · GoTry')
 @section('content')
-@include('admin.nav')<h1>Accounts</h1>
+<div class="admin-workspace">
+@include('admin.nav')
+<div class="admin-content">
+@if(session('status'))<p class="notice" role="status">{{ session('status') }}</p>@endif
+@if($errors->any())<div class="error" role="alert">{{ $errors->first() }}</div>@endif
+
+<h1>Accounts</h1>
 <form method="get" class="admin-filters">
     <label>Search name/email<input name="q" value="{{ request('q') }}" maxlength="160"></label>
     <label>Role<select name="role"><option value="">All roles</option>@foreach(['admin'=>'Super admin','provider'=>'Provider','parent'=>'Parent'] as $value=>$label)<option value="{{ $value }}" @selected(request('role')===$value)>{{ $label }}</option>@endforeach</select></label>
@@ -40,4 +46,6 @@
 @endforelse
 </ul>
 {{ $users->links() }}
+</div>
+</div>
 @endsection

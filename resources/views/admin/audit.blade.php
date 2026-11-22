@@ -1,7 +1,13 @@
 @extends('layouts.app')
 @section('title','Audit history · GoTry')
 @section('content')
-@include('admin.nav')<h1>Audit history</h1>
+<div class="admin-workspace">
+@include('admin.nav')
+<div class="admin-content">
+@if(session('status'))<p class="notice" role="status">{{ session('status') }}</p>@endif
+@if($errors->any())<div class="error" role="alert">{{ $errors->first() }}</div>@endif
+
+<h1>Audit history</h1>
 <nav class="admin-nav" aria-label="Audit category">@foreach(['activity'=>'Activities','interest'=>'Registrations','account'=>'Account access'] as $value=>$label)<a href="{{ route('admin.audit',['type'=>$value]) }}" @if($type===$value) aria-current="page" @endif>{{ $label }}</a>@endforeach</nav>
 <p>History is read-only. Registration audit rows exclude child names and ages.</p>
 <ol class="admin-records">
@@ -36,4 +42,6 @@
 @endforelse
 </ol>
 {{ $events->links() }}
+</div>
+</div>
 @endsection
