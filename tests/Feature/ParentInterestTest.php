@@ -54,6 +54,30 @@ class ParentInterestTest extends TestCase
         return Interest::where('parent_id', $parent->id)->where('activity_id', $activity->id)->latest('id')->firstOrFail();
     }
 
+    public function test_portal_summary_and_payment_reminder_are_parent_scoped_and_shown_once(): void
+    {
+        $parent = $this->user();
+        $activity = $this->activity();
+        $interest = $this->register($parent, $activity);
+        $activity->update(['status' => 'proceeding_pending_payments']);
+        $this->actingAs($parent)->withSession(['parent_payment_reminder' => true])
+            ->get('/parent')->assertOk()->assertSee('data-payment-reminder', false)->assertSee('Next upcoming trial');
+        $this->get('/parent')->assertOk()->assertDontSee('data-payment-reminder', false);
+        $this->actingAs($this->user())->withSession(['parent_payment_reminder' => true])
+            ->get('/parent')->assertOk()->assertDontSee('data-payment-reminder', false)->assertDontSee('Next upcoming trial');
+
+        DB::table('trial_payments')->insert([
+            'interest_id' => $interest->id, 'attempt' => (string) Str::uuid(),
+            'interest_version' => $interest->version, 'activity_version' => $activity->version,
+            'order_id' => 'PAIDORDER', 'capture_id' => 'PAIDCAPTURE', 'paid_at' => now(),
+        ]);
+        $this->actingAs($parent)->withSession(['parent_payment_reminder' => true])
+            ->get('/parent')->assertOk()->assertDontSee('data-payment-reminder', false)->assertSee('Next upcoming trial');
+        $activity->update(['status' => 'cancelled_by_admin']);
+        $this->withSession(['parent_payment_reminder' => true])->get('/parent')
+            ->assertOk()->assertDontSee('data-payment-reminder', false)->assertDontSee('Next upcoming trial');
+    }
+
     public function test_parent_can_save_children_select_them_and_cannot_use_another_accounts_child(): void
     {
         $parent = $this->user();

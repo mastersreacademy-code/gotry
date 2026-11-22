@@ -21,6 +21,42 @@
         <a class="button secondary" href="{{ route('parent.children') }}">My children</a>
     </div>
 </section>
+@if($upcoming)
+<section class="portal-upcoming" aria-labelledby="upcoming-heading">
+    <div class="portal-upcoming-date" aria-hidden="true">
+        <strong>{{ $upcoming['startsAt']->format('d') }}</strong>
+        <span>{{ $upcoming['startsAt']->format('M') }}</span>
+    </div>
+    <div>
+        <p id="upcoming-heading">Next upcoming trial</p>
+        <h2>{{ $upcoming['interest']->activity->title }}</h2>
+        <p>{{ $upcoming['interest']->child_name }} · <time datetime="{{ $upcoming['startsAt']->toIso8601String() }}">{{ $upcoming['startsAt']->format('D, j M · g:i a') }}</time> (Sydney)</p>
+    </div>
+    <span class="status">{{ $upcoming['label'] }}</span>
+</section>
+@endif
+@if(count($paymentsDue) > 0)
+<p class="notice" role="status">
+    {{ count($paymentsDue) }} {{ count($paymentsDue) === 1 ? 'trial registration is' : 'trial registrations are' }} ready for payment.
+    <a href="{{ route('parent.dashboard') }}#ready-for-payment">Review payments →</a>
+</p>
+@endif
+@if($showPaymentReminder)
+<dialog class="portal-payment-dialog" data-payment-reminder aria-labelledby="payment-reminder-title" aria-describedby="payment-reminder-description">
+    <h2 id="payment-reminder-title">Your trial is ready for payment</h2>
+    <p id="payment-reminder-description">{{ count($paymentsDue) }} {{ count($paymentsDue) === 1 ? 'registration has' : 'registrations have' }} reached the minimum interest needed to proceed. Review the details before paying the AUD 2.00 trial fee.</p>
+    <ul>
+        @foreach($paymentsDue as $due)
+            <li><strong>{{ $due->child_name }}</strong> · {{ $due->activity->title }}</li>
+        @endforeach
+    </ul>
+    <div class="portal-reminder-actions">
+        <a class="button" href="{{ route('parent.dashboard') }}#ready-for-payment">Review payments</a>
+        <form method="dialog"><button class="secondary" type="submit" autofocus>Later</button></form>
+    </div>
+</dialog>
+<script type="module" src="{{ asset('js/payment-reminder.js') }}"></script>
+@endif
 <div class="portal-workspace">
 <nav class="portal-navigation" aria-label="My List sections">
     <a href="#registered-interest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Registered Interest</span></a>

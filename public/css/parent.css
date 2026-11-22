@@ -296,3 +296,19 @@
     .parent-dashboard .portal-workspace { gap: 1.1rem; }
     .parent-dashboard .portal-workspace .portal-navigation a { min-height: 2.65rem; font-size: .8rem; padding: .55rem .6rem; gap: .45rem; }
 }
+
+.portal-upcoming { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin-top: 1.25rem; padding: 1.15rem 1.35rem; border: 1px solid #dce6f5; border-radius: 1.1rem; background: #fff; }
+.portal-upcoming-date { display: grid; justify-items: center; min-width: 3.5rem; padding: .5rem; border-radius: .8rem; background: #eaf1ff; color: #234e87; }
+.portal-upcoming-date strong { font-size: 1.7rem; line-height: 1.1; }
+.portal-upcoming-date span { font-size: .8rem; }
+.portal-upcoming > div:nth-child(2) { flex: 1; min-width: min(100%, 12rem); }
+.portal-upcoming h2 { margin: .3rem 0; font-size: 1.15rem; }
+.portal-upcoming p { margin: 0; font-size: .85rem; color: #5c6c85; }
+.portal-payment-dialog { box-sizing: border-box; width: min(32rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); padding: clamp(1.25rem, 4vw, 2rem); overflow: auto; border: 1px solid #dfe5f2; border-radius: 1.4rem; color: #172749; box-shadow: 0 24px 70px rgb(16 35 69 / 25%); }
+.portal-payment-dialog::backdrop { background: rgb(16 35 69 / 45%); }
+.portal-payment-dialog h2 { margin-top: 0; font-size: 1.5rem; line-height: 1.25; }
+.portal-payment-dialog p, .portal-payment-dialog li { font-size: .95rem; line-height: 1.6; }
+.portal-payment-dialog li { margin-block: .5rem; overflow-wrap: anywhere; }
+.portal-reminder-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-top: 1.25rem; }
+.portal-reminder-actions form { margin: 0; }
+.portal-reminder-actions :is(a, button) { padding: .7rem 1rem; border-radius: .75rem; }

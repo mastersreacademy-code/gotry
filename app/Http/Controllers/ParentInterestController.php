@@ -35,7 +35,11 @@ class ParentInterestController
         $payments = DB::table('trial_payments')->whereIn('interest_id', $interests->getCollection()->modelKeys())
             ->get(['interest_id', 'attempt', 'paid_at'])->keyBy('interest_id');
 
-        return view('parent.interests', [...compact('interests', 'availability', 'openSessions', 'activityFilter', 'payments'), ...$inbox->inbox($request, $outbox)]);
+        $summary = app(\App\Services\ParentPortalSummary::class)->forParent($request->user());
+        $showPaymentReminder = (bool) $request->session()->pull('parent_payment_reminder', false)
+            && count($summary['paymentsDue']) > 0;
+
+        return view('parent.interests', [...$summary, 'showPaymentReminder' => $showPaymentReminder, ...compact('interests', 'availability', 'openSessions', 'activityFilter', 'payments'), ...$inbox->inbox($request, $outbox)]);
     }
 
     public function store(Request $request, Activity $activity, ParentInterests $service)
