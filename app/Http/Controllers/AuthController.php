@@ -54,6 +54,9 @@ class AuthController
 
     private function afterAuthentication(Request $request, User $user): RedirectResponse
     {
+        if ($user->role === 'parent') {
+            $request->session()->put('parent_payment_reminder', true);
+        }
         $activityId = filter_var($request->input('activity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
         if ($user->role === 'parent' && $activityId !== false
             && Activity::whereKey($activityId)->where('status', 'pending_registrations')
