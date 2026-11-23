@@ -80,7 +80,7 @@ Artisan::command('gotry:seed-demo-activities {provider : Email of an existing ac
     $firstDate = $today->next('Saturday')->addWeek();
     $deadline = $firstDate->subDays(2)->toDateString();
     $defaults = [
-        'business_name' => 'GoTry Demo Activities', 'contact_name' => 'Demo Contact',
+        'abn' => '51824753556', 'business_name' => 'GoTry Demo Activities', 'contact_name' => 'Demo Contact',
         'contact_email' => 'activities@example.test', 'phone' => '0200000000',
         'min_age' => 6, 'max_age' => 12, 'trial_duration' => 45, 'deadline' => $deadline,
         'trial_type' => 'group', 'trial_date' => $firstDate->toDateString(), 'trial_time' => '09:00',

@@ -312,3 +312,17 @@
 .portal-reminder-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; margin-top: 1.25rem; }
 .portal-reminder-actions form { margin: 0; }
 .portal-reminder-actions :is(a, button) { padding: .7rem 1rem; border-radius: .75rem; }
+
+.portal-child-filter { display: flex; flex-wrap: wrap; gap: .65rem; align-items: center; margin: 1rem 0; }
+.portal-child-filter label { margin: 0; font-size: .85rem; font-weight: 650; }
+.portal-child-filter select { width: auto; max-width: 100%; min-width: min(12rem, 100%); margin: 0; border-radius: .65rem; }
+.portal-progress { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; padding: 0; margin: .8rem 0; }
+.portal-progress li { border-top: 3px solid #dce4f0; padding-top: .45rem; color: #68778f; font-size: .7rem; line-height: 1.4; }
+.portal-progress li.is-complete { color: #1b5d46; border-top-color: #63ae8e; }
+.parent-dashboard .parent-card .portal-minimum { color: #285388; background: #edf4ff; border-radius: .6rem; padding: .5rem .7rem; }
+.parent-dashboard .portal-list-content .portal-registration-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); }
+.parent-dashboard .portal-list-content .parent-card { display: block; }
+.portal-list-content .parent-card > .portal-child { margin: .6rem 0; }
+@media (max-width: 600px) {
+    .parent-dashboard .portal-list-content .portal-registration-grid { grid-template-columns: minmax(0, 1fr); }
+}

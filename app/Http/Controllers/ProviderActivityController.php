@@ -24,7 +24,7 @@ class ProviderActivityController
         return view('provider.index', [
             'activities' => Activity::where('provider_id', $request->user()->id)->latest('id')->paginate(20),
             'draftStep' => $request->session()->has($this->key($request))
-                ? min(5, $request->session()->get($this->key($request).'.completed', 0) + 1)
+                ? min(6, $request->session()->get($this->key($request).'.completed', 0) + 1)
                 : null,
         ]);
     }
@@ -36,14 +36,14 @@ class ProviderActivityController
             $request->session()->put($key, ['token' => (string) Str::uuid(), 'completed' => 0, 'data' => []]);
         }
         $draft = $request->session()->get($key);
-        $maximum = min(5, $draft['completed'] + 1);
+        $maximum = min(6, $draft['completed'] + 1);
         if ($step === null || $step > $maximum) return redirect()->route('provider.create', ['step' => $maximum]);
         $data = array_replace(['trial_type' => 'group', 'trial_duration' => 45, 'regular_format' => 'group',
             'multiple_days' => '0', 'regular_day' => 'Saturday', 'regular_time' => '09:00', 'lessons_per_term' => 10,
             'discount_type' => 'none', 'discount_applies' => 'term'], $draft['data']);
         return view('provider.wizard', ['step' => $step, 'steps' => ActivityDraft::STEPS, 'fields' => $schema->fields($step),
-            'data' => $data, 'token' => $draft['token'], 'prices' => $step === 5 ? $pricing->preview($draft['data']) : [],
-            'review' => $step === 5 ? $this->review($schema, $draft['data']) : []]);
+            'data' => $data, 'token' => $draft['token'], 'prices' => $step === 6 ? $pricing->preview($draft['data']) : [],
+            'review' => $step === 6 ? $this->review($schema, $draft['data']) : []]);
     }
 
     public function save(Request $request, ActivityDraft $schema, int $step)
@@ -51,6 +51,19 @@ class ProviderActivityController
         $key = $this->key($request);
         $draft = $request->session()->get($key);
         if (! $draft || $step > $draft['completed'] + 1) return redirect()->route('provider.create');
+        if ($step === 5) {
+            $request->validate([
+                'logo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048', 'dimensions:max_width=4096,max_height=4096'],
+                'background' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:max_width=5000,max_height=5000'],
+            ]);
+            foreach (['logo', 'background'] as $kind) {
+                if ($request->hasFile($kind)) {
+                    $path = $request->file($kind)->store('provider-drafts/'.$request->user()->id.'/'.$draft['token'], 'local');
+                    abort_unless($path, 503, 'Image could not be saved. Please retry.');
+                    $draft['data']['branding'][$kind] = $path;
+                }
+            }
+        }
         $validated = $schema->validate($step, $request->all());
         // Remove obsolete values when switching group/individual or schedule/discount types.
         foreach ($schema->fields($step) as $field) unset($draft['data'][$field[0]]);
@@ -68,11 +81,12 @@ class ProviderActivityController
         if ($existing) return redirect()->route('provider.activity', $existing);
         $key = $this->key($request);
         $draft = $request->session()->get($key);
-        abort_unless($draft && $draft['completed'] === 4 && hash_equals($draft['token'], $token), 409, 'Your draft changed. Reopen the form and review it again.');
+        abort_unless($draft && $draft['completed'] === 5 && hash_equals($draft['token'], $token), 409, 'Your draft changed. Reopen the form and review it again.');
         $request->validate(['child_safety' => ['accepted'], 'insurance' => ['accepted'], 'honour_terms' => ['accepted']]);
         // Recheck every step: dates can expire while the draft is left open.
         $data = [];
         for ($step = 1; $step <= 4; $step++) $data = array_replace($data, $schema->validate($step, $draft['data']));
+        $data['branding'] = $draft['data']['branding'] ?? [];
         $activity = DB::transaction(function () use ($request, $token, $data) {
             $activity = Activity::firstOrCreate(['provider_id' => $request->user()->id, 'submission_token' => $token], [
                 'title' => $data['activity_name'], 'category' => $data['category'], 'status' => 'pending_approval',

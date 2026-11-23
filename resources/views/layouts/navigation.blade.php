@@ -1,7 +1,9 @@
 <nav aria-label="Main navigation">
-    <a href="{{ route('home') }}">@if($showIcons ?? false)@include('layouts.navigation-icon', ['icon' => 'home']) @endif Home</a>
+    <a href="{{ auth()->user()?->role === 'parent' ? route('parent.children') : route('home') }}">@if($showIcons ?? false)@include('layouts.navigation-icon', ['icon' => 'home']) @endif {{ auth()->user()?->role === 'parent' ? 'Add child' : 'Home' }}</a>
     @auth
         @if(auth()->user()->role === 'parent')
+            <a href="{{ route('activities.index') }}">Explore activities</a>
+            <a href="{{ route('notifications.index') }}">Notifications</a>
             <a href="{{ route('parent.dashboard') }}">@if($showIcons ?? false)@include('layouts.navigation-icon', ['icon' => 'list']) @endif My List</a>
         @else
         <a href="{{ route('dashboard') }}">@if($showIcons ?? false)@include('layouts.navigation-icon', ['icon' => 'dashboard']) @endif Dashboard</a>

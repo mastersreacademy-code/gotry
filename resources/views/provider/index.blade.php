@@ -18,7 +18,7 @@
 
     @if($draftStep)
         <div class="provider-draft">
-            <div><strong>Listing in progress</strong><p>Step {{ $draftStep }} of 5 · {{ \App\Services\ActivityDraft::STEPS[$draftStep] }}</p></div>
+            <div><strong>Listing in progress</strong><p>Step {{ $draftStep }} of 6 · {{ \App\Services\ActivityDraft::STEPS[$draftStep] }}</p></div>
             <a href="{{ route('provider.create') }}">Continue draft →</a>
         </div>
     @endif

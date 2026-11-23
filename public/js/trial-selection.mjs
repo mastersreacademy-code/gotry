@@ -1,16 +1,34 @@
 const form = document.querySelector('[data-trial-form]');
 const session = form?.querySelector('#trial_session');
+const child = form?.querySelector('#child_id');
+const registrationStatus = form?.querySelector('[data-child-registration-status]');
+const cta = document.querySelector('[data-registration-cta]');
 
-if (session) {
+if (form) {
     const actions = form.querySelectorAll('button[data-intent]');
     const sync = () => {
-        const intent = session.selectedOptions[0]?.dataset.intent;
+        const intent = session?.selectedOptions[0]?.dataset.intent;
+        const status = child?.selectedOptions[0]?.dataset.registrationStatus;
+        const registered = Boolean(status);
+        if (registrationStatus) {
+            registrationStatus.hidden = !registered;
+            registrationStatus.textContent = status === 'waitlisted' ? 'On waitlist — manage this entry in My List.' : 'Registered Interest — manage this entry in My List.';
+        }
+        if (cta) {
+            const link = cta.querySelector('a');
+            if (link) {
+                link.hidden = registered;
+                const label = cta.querySelector('[data-cta-status]');
+                if (label) label.hidden = !registered;
+            }
+        }
         for (const action of actions) {
-            action.hidden = Boolean(intent) && action.dataset.intent !== intent;
-            action.disabled = !intent || action.hidden;
+            action.hidden = registered || (Boolean(intent) && action.dataset.intent !== intent);
+            action.disabled = (Boolean(session) && !intent) || action.hidden || !child?.value;
         }
     };
-    session.addEventListener('change', sync);
+    session?.addEventListener('change', sync);
+    child?.addEventListener('change', sync);
     window.addEventListener('pageshow', sync);
     sync();
 }

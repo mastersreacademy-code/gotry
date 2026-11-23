@@ -64,7 +64,7 @@
 .provider-ui.wizard { padding: clamp(1.125rem, 4vw, 2.5rem); }
 .wizard-heading { color: var(--provider-muted); font-size: .875rem; }
 .provider-ui .wizard-steps {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: 0;
     margin: 1.5rem 0 2rem;
 }

@@ -11,14 +11,7 @@
         <p>Your children’s next experiences, all in one place.</p>
     </div>
     <div class="portal-actions">
-        <a class="portal-bell" href="{{ route('notifications.index') }}" aria-label="Notifications, {{ $unread }} unread" title="Notifications">
-            @include('layouts.navigation-icon', ['icon' => 'bell'])
-            @if($unread > 0)
-                <span class="portal-bell-badge" aria-hidden="true">{{ $unread > 99 ? '99+' : $unread }}</span>
-            @endif
-        </a>
-        <a class="button" href="{{ route('activities.index') }}">Explore activities →</a>
-        <a class="button secondary" href="{{ route('parent.children') }}">My children</a>
+        <a class="button secondary" href="{{ route('parent.children') }}">Add child / My children</a>
     </div>
 </section>
 @if($upcoming)
@@ -28,7 +21,7 @@
         <span>{{ $upcoming['startsAt']->format('M') }}</span>
     </div>
     <div>
-        <p id="upcoming-heading">Next upcoming trial</p>
+        <p id="upcoming-heading">Next confirmed activity</p>
         <h2>{{ $upcoming['interest']->activity->title }}</h2>
         <p>{{ $upcoming['interest']->child_name }} · <time datetime="{{ $upcoming['startsAt']->toIso8601String() }}">{{ $upcoming['startsAt']->format('D, j M · g:i a') }}</time> (Sydney)</p>
     </div>
@@ -57,11 +50,26 @@
 </dialog>
 <script type="module" src="{{ asset('js/payment-reminder.js') }}"></script>
 @endif
+<form method="get" action="{{ route('parent.dashboard') }}" class="portal-child-filter">
+    @if($activityFilter)
+        <input type="hidden" name="activity" value="{{ $activityFilter }}">
+    @endif
+    <label for="filter-child">Show registrations for</label>
+    <select id="filter-child" name="child">
+        <option value="">All children</option>
+        @foreach($children as $child)
+            <option value="{{ $child->id }}" @selected((string) $childFilter === (string) $child->id)>{{ $child->fullName() }}</option>
+        @endforeach
+    </select>
+    <button class="secondary" type="submit">Apply</button>
+</form>
 <div class="portal-workspace">
 <nav class="portal-navigation" aria-label="My List sections">
+    <a href="#all-registrations"><span>All registrations</span></a>
     <a href="#registered-interest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg><span>Registered Interest</span></a>
     <a href="#ready-for-payment"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h3"/></svg><span>Ready for Payment</span></a>
     <a href="#confirmed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span>Confirmed</span></a>
+    <a href="#waitlist"><span>Waitlist</span></a>
     <a href="#past-registrations"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 12a9 9 0 1 0 3-6M3 3v6h6M12 7v5l3 2"/></svg><span>Past registrations</span></a>
 </nav>
 <div class="portal-list-content">
@@ -80,12 +88,13 @@
             : $activity->status;
         if ($interest->status === 'withdrawn' || str_starts_with($status, 'cancelled_')) return 'Past registrations';
         if ($payments->get($interest->id)?->paid_at) return 'Confirmed';
+        if (in_array($interest->status, ['waitlisted', 'offered'], true)) return 'Waitlist';
         return $interest->status === 'interested' && $status === 'proceeding_pending_payments'
             ? 'Ready for Payment' : 'Registered Interest';
     });
 @endphp
-@foreach(['Registered Interest', 'Ready for Payment', 'Confirmed', 'Past registrations'] as $group)
-<section class="portal-group" id="{{ \Illuminate\Support\Str::slug($group) }}" data-stage="{{ \Illuminate\Support\Str::slug($group) }}">
+@foreach(['Registered Interest', 'Ready for Payment', 'Confirmed', 'Waitlist', 'Past registrations'] as $group)
+<section class="portal-group" id="{{ \Illuminate\Support\Str::slug($group) }}" data-stage="{{ \Illuminate\Support\Str::slug($group) }}" data-entry-count="{{ $groups->get($group, collect())->count() }}">
 <div class="portal-group-heading"><h2>{{ $group }}</h2><span>{{ $groups->get($group, collect())->count() }} on this page</span></div>
 <div class="grid portal-registration-grid">
 @forelse($groups->get($group, []) as $interest)
@@ -124,6 +133,16 @@
             <p>{{ $sessionStart }} (Sydney) · {{ \App\Models\Activity::STATUSES[$sessionStatus] }}</p>
         @elseif(($activity->details['trial_type'] ?? '')==='group')<p>{{ $activity->details['trial_date'] }} · {{ $activity->details['trial_time'] }} (Sydney) · {{ $activity->statusLabel() }}</p>@else<p>{{ $activity->statusLabel() }}</p>@endif
         @php($payment = $payments->get($interest->id))
+        @if($interest->status !== 'withdrawn' && ! $cancelled)
+            <ol class="portal-progress" aria-label="Registration progress">
+                <li class="is-complete">Interest registered</li>
+                <li @class(['is-complete' => (bool) $payment?->paid_at || $sessionStatus === 'proceeding_pending_payments'])>Payment requested</li>
+                <li @class(['is-complete' => (bool) $payment?->paid_at])>Booking confirmed</li>
+            </ol>
+            @if($interest->status === 'interested' && $sessionStatus === 'pending_registrations' && ($activity->details['trial_type'] ?? '') === 'group')
+                <p class="portal-minimum">{{ max(0, (int) ($activity->details['trial_min'] ?? 0) - $slot['count']) }} more needed to unlock the trial</p>
+            @endif
+        @endif
         @if($payment?->paid_at)
             <p class="notice">Paid · AUD 2.00 · PayPal Sandbox</p>
         @elseif($interest->status === 'interested' && $sessionStatus === 'proceeding_pending_payments' && $activity->provider?->is_active && config('paypal.client_id') && config('paypal.client_secret'))

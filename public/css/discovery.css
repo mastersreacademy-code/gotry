@@ -510,3 +510,7 @@
     font-size: clamp(1.9rem, 4vw, 2.75rem);
 }
 .discovery-directory .directory-results-heading { margin-top: 1.5rem; }
+
+.activity-final-action.is-registered a.button { background: #e3f4ec; color: #14583d; border: 1px solid #c8e7d6; }
+.registered-interest-label { display: inline-block; padding: .8rem 1.2rem; border-radius: 999px; background: #e3f4ec; color: #14583d; font-size: 1.1rem; font-weight: 750; }
+.registered-interest-label[hidden] { display: none; }

@@ -31,7 +31,10 @@ class ActivityBrandingController
         abort_unless($activity->status === 'pending_registrations', 404);
         $disk = Storage::disk('local');
         $path = 'activity-branding/'.$activity->id.'/'.$kind;
-        abort_unless($disk->exists($path), 404);
+        if (! $disk->exists($path)) {
+            $path = $activity->details['branding'][$kind] ?? '';
+        }
+        abort_unless($path && $disk->exists($path), 404);
 
         return $disk->response($path, null, [
             'Cache-Control' => 'no-cache',

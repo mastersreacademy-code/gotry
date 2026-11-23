@@ -15,12 +15,16 @@ class ParentInterestController
     public function index(Request $request, ParentInterests $service, NotificationController $inbox, \App\Services\NotificationOutbox $outbox)
     {
         $activityFilter = filter_var($request->query('activity'), FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+        $children = \App\Models\Child::where('parent_id', $request->user()->id)->orderBy('first_name')->get();
+        $childFilter = $request->validate(['child' => ['nullable', 'integer', 'min:1']])['child'] ?? null;
+        if ($childFilter) abort_unless($children->contains('id', (int) $childFilter), 404);
         $interests = Interest::where('parent_id', $request->user()->id)
+            ->when($childFilter, fn ($query, $id) => $query->where('child_id', $id))
             ->when($activityFilter, fn ($query, $id) => $query->where('activity_id', $id))
             ->with(['activity.provider', 'latestEvent'])
             ->orderByRaw("CASE WHEN status = 'offered' AND offer_expires_at > ? THEN 0 WHEN status IN ('interested', 'waitlisted') THEN 1 ELSE 2 END", [now()])
             ->orderByRaw("CASE WHEN status = 'offered' AND offer_expires_at > ? THEN offer_expires_at END", [now()])
-            ->latest('id')->paginate(20)->appends($activityFilter ? ['activity' => $activityFilter] : []);
+            ->latest('id')->paginate(20)->withQueryString();
         $availability = [];
         $openSessions = [];
         foreach ($interests as $interest) {
@@ -39,7 +43,7 @@ class ParentInterestController
         $showPaymentReminder = (bool) $request->session()->pull('parent_payment_reminder', false)
             && count($summary['paymentsDue']) > 0;
 
-        return view('parent.interests', [...$summary, 'showPaymentReminder' => $showPaymentReminder, ...compact('interests', 'availability', 'openSessions', 'activityFilter', 'payments'), ...$inbox->inbox($request, $outbox)]);
+        return view('parent.interests', [...$summary, 'showPaymentReminder' => $showPaymentReminder, ...compact('children', 'childFilter', 'interests', 'availability', 'openSessions', 'activityFilter', 'payments'), ...$inbox->inbox($request, $outbox)]);
     }
 
     public function store(Request $request, Activity $activity, ParentInterests $service)

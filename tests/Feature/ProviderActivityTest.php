@@ -32,7 +32,7 @@ class ProviderActivityTest extends TestCase
     {
         $date = now('Australia/Sydney')->addMonths(2)->format('Y-m-d');
         return [
-            1 => ['business_name' => 'Junior Soccer Academy', 'contact_name' => 'Private Contact', 'contact_email' => 'private-contact@example.test', 'phone' => '0412345678'],
+            1 => ['abn' => '51824753556', 'business_name' => 'Junior Soccer Academy', 'contact_name' => 'Private Contact', 'contact_email' => 'private-contact@example.test', 'phone' => '0412345678'],
             2 => ['activity_name' => 'Junior Soccer Skills', 'category' => 'Sports & Fitness', 'min_age' => 6, 'max_age' => 10, 'description' => 'Learn teamwork and ball skills.', 'venue' => 'North Sydney', 'bring' => 'Water bottle'],
             3 => ['trial_type' => 'group', 'trial_date' => $date, 'trial_time' => '09:00', 'trial_min' => 8, 'trial_max' => 12, 'trial_duration' => 45, 'deadline' => $date],
             4 => ['regular_format' => 'group', 'multiple_days' => '0', 'regular_day' => 'Saturday', 'regular_time' => '09:00', 'regular_min' => 8, 'regular_standard' => 10, 'regular_max' => 12, 'standard_price' => '20', 'small_group_price' => '25', 'lessons_per_term' => 10, 'discount_type' => 'percent', 'discount_value' => '10', 'discount_applies' => 'term'],
@@ -46,13 +46,44 @@ class ProviderActivityTest extends TestCase
             $this->get('/provider/new/'.$step)->assertOk();
             $this->post('/provider/new/'.$step, $data)->assertSessionHasNoErrors()->assertRedirect('/provider/new/'.($step + 1));
         }
-        $this->get('/provider/new/5')->assertOk()->assertSee('Review your listing')->assertSee('$180.00');
+        $this->get('/provider/new/5')->assertOk()->assertSee('Add your activity images');
+        $this->post('/provider/new/5')->assertRedirect('/provider/new/6');
+        $this->get('/provider/new/6')->assertOk()->assertSee('Review your listing')->assertSee('$180.00');
         return session('provider_draft.'.$provider->id.'.token');
     }
 
     private function submit(string $token): array
     {
         return ['submission_token' => $token, 'child_safety' => 1, 'insurance' => 1, 'honour_terms' => 1];
+    }
+
+    public function test_business_details_normalize_abn_and_bare_domain_and_require_abn(): void
+    {
+        $schema = new ActivityDraft;
+        $business = $schema->validate(1, [...$this->steps()[1], 'abn' => '51 824 753 556', 'website' => 'tennis.com.au']);
+        $this->assertSame('51824753556', $business['abn']);
+        $this->assertSame('https://www.tennis.com.au', $business['website']);
+        $this->expectException(ValidationException::class);
+        $schema->validate(1, [...$this->steps()[1], 'abn' => '']);
+    }
+
+    public function test_images_are_saved_in_the_draft_and_published_only_after_approval(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('local');
+        $provider = $this->user();
+        $token = $this->draft($provider);
+        $this->post('/provider/new/5', [
+            'logo' => \Illuminate\Http\UploadedFile::fake()->image('logo.png'),
+        ])->assertRedirect('/provider/new/6');
+        $path = session('provider_draft.'.$provider->id.'.data.branding.logo');
+        $this->assertNotEmpty($path);
+        \Illuminate\Support\Facades\Storage::disk('local')->assertExists($path);
+        $this->post('/provider/submit', $this->submit($token))->assertRedirect();
+        $activity = Activity::sole();
+        $this->assertSame($path, $activity->details['branding']['logo']);
+        $this->get('/activities/'.$activity->id.'/branding/logo')->assertNotFound();
+        $activity->update(['status' => 'pending_registrations']);
+        $this->get('/activities/'.$activity->id.'/branding/logo')->assertOk();
     }
 
     public function test_provider_completes_wizard_submits_once_and_only_owner_sees_details(): void
@@ -79,7 +110,7 @@ class ProviderActivityTest extends TestCase
         $steps = $this->steps();
         $steps[3]['extra_trial_times'] = "2027-01-11 10:30\r\n2027-01-12 11:30";
         $token = $this->draft($provider, $steps);
-        $this->get('/provider/new/5')->assertSee('2027-01-12 11:30');
+        $this->get('/provider/new/6')->assertSee('2027-01-12 11:30');
         $this->post('/provider/submit', $this->submit($token))->assertRedirect('/provider/activities/1');
         $this->assertSame("2027-01-11 10:30\n2027-01-12 11:30", Activity::firstOrFail()->details['extra_trial_times']);
         $this->get('/provider/activities/1')->assertOk()->assertSee('Group trial sessions')->assertSee('2027-01-11 10:30');
@@ -233,7 +264,7 @@ class ProviderActivityTest extends TestCase
         $this->post('/provider/new/4', $regular)->assertSessionHasNoErrors();
         $data = session('provider_draft.'.$provider->id.'.data');
         foreach (['trial_date','trial_min','regular_day','standard_price','discount_value','discount_applies'] as $key) $this->assertArrayNotHasKey($key, $data);
-        $this->get('/provider/new/5')->assertOk()->assertSee('$60.00');
+        $this->get('/provider/new/6')->assertOk()->assertSee('$60.00');
         $other = $this->user();
         $this->actingAs($other)->get('/provider/new/1')->assertOk()->assertDontSee('Junior Soccer Academy');
         $this->post('/provider/submit', $this->submit($token))->assertStatus(409);
