@@ -17,8 +17,8 @@
             default => null,
         };
         $branding = \Illuminate\Support\Facades\Storage::disk('local');
-        $logo = $branding->exists("activity-branding/{$activityId}/logo");
-        $background = $branding->exists("activity-branding/{$activityId}/background");
+        $logo = $hasDraftLogo || $branding->exists("activity-branding/{$activityId}/logo");
+        $background = $hasDraftBackground || $branding->exists("activity-branding/{$activityId}/background");
     @endphp
     @include('layouts.masthead', [
         'mastheadTitle' => $details['business_name'] ?? $title,
@@ -138,8 +138,9 @@
         </section>
     @endif
     @if(($canRegister || $canWaitlist) && (auth()->guest() || auth()->user()->role === 'parent'))
-        <div class="activity-final-action">
+        <div class="activity-final-action" data-registration-cta>
             <a class="button" href="#trial">{{ $canRegister ? 'Register interest for the trial' : 'Join the trial waitlist' }} →</a>
+            <span class="registered-interest-label" data-cta-status hidden>Registered Interest</span>
             <p>Registering interest is free. No payment is collected on this page.</p>
         </div>
     @endif
@@ -162,11 +163,13 @@
                         @endforeach
                     </select>
                 @endif
+                <p class="notice" data-child-registration-status hidden></p>
                 <label for="child_id">Which child is this activity for?</label>
                 <select id="child_id" name="child_id" required>
                     <option value="">Select a child</option>
                     @foreach($children as $child)
-                        <option value="{{ $child->id }}" @selected((string) old('child_id', request()->query('child')) === (string) $child->id)>{{ $child->fullName() }} · Age {{ $child->age }}</option>
+                        @php($entry = $mine->first(fn ($entry) => $entry->child_id === $child->id && $entry->status !== 'withdrawn'))
+                        <option data-registration-status="{{ $entry?->status }}" value="{{ $child->id }}" @selected((string) old('child_id', request()->query('child', $children->count() === 1 ? $children->first()->id : null)) === (string) $child->id)>{{ $child->fullName() }} · Age {{ $child->age }}</option>
                     @endforeach
                 </select>
                 <p><a href="{{ route('parent.children', ['activity' => $activityId]) }}">Add a child to your account</a></p>

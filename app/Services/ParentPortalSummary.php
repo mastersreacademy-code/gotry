@@ -51,7 +51,7 @@ class ParentPortalSummary
             if ($status === 'proceeding_pending_payments' && ! $isPaid) {
                 $paymentsDue[] = $interest;
             }
-            if ($start && ($upcoming === null || $start->lessThan($upcoming['startsAt']))) {
+            if ($isPaid && $status === 'proceeding_pending_payments' && $start && ($upcoming === null || $start->lessThan($upcoming['startsAt']))) {
                 $upcoming = [
                     'interest' => $interest,
                     'startsAt' => $start,

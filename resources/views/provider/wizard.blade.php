@@ -18,12 +18,20 @@
             </li>
         @endforeach
     </ol>
-    <h1>{{ [1 => 'Tell us about your organisation', 2 => 'What activity are you offering?', 3 => 'Set up your introductory trial', 4 => 'Regular lesson details', 5 => 'Review your listing'][$step] }}</h1>
-    <p>{{ [1 => 'These details help us verify your business and contact you about bookings.', 2 => 'Describe what children will learn, do and experience.', 3 => 'These details apply only to the introductory trial, separate from your regular paid programme.', 4 => 'Provide details of ongoing lessons families may choose after their introductory trial.', 5 => 'Check trial and regular programme details separately before submitting.'][$step] }}</p>
+    <h1>{{ [1 => 'Tell us about your organisation', 2 => 'What activity are you offering?', 3 => 'Set up your introductory trial', 4 => 'Regular lesson details', 5 => 'Add your activity images', 6 => 'Review your listing'][$step] }}</h1>
+    <p>{{ [1 => 'These details help us verify your business and contact you about bookings.', 2 => 'Describe what children will learn, do and experience.', 3 => 'These details apply only to the introductory trial, separate from your regular paid programme.', 4 => 'Provide details of ongoing lessons families may choose after their introductory trial.', 5 => 'Upload your logo and background image, or continue with the default artwork.', 6 => 'Check trial and regular programme details separately before submitting.'][$step] }}</p>
     @if($errors->any())<div class="error" role="alert"><ul>@foreach($errors->all() as $message)<li>{{ $message }}</li>@endforeach</ul></div>@endif
-    <form method="post" action="{{ $step === 5 ? route('provider.submit') : route('provider.save', ['step' => $step]) }}" id="activity-form">
+    <form method="post" action="{{ $step === 6 ? route('provider.submit') : route('provider.save', ['step' => $step]) }}" id="activity-form" enctype="multipart/form-data">
         @csrf
-        @if($step < 5)
+        @if($step === 5)
+            @foreach(['logo' => 'Provider logo (up to 2 MB)', 'background' => 'Background image (up to 5 MB)'] as $kind => $imageLabel)
+                <label for="{{ $kind }}">{{ $imageLabel }}</label>
+                <input type="file" id="{{ $kind }}" name="{{ $kind }}" accept="image/jpeg,image/png,image/webp">
+                @if(!empty($data['branding'][$kind]))
+                    <p>{{ ucfirst($kind) }} saved. Choose a file to replace it.</p>
+                @endif
+            @endforeach
+        @elseif($step < 6)
             <div class="fields">
             @foreach($fields as $field)
                 @php([$name, $label, $type] = $field)
@@ -60,10 +68,11 @@
         @endif
         <div class="actions">
             <a class="button secondary" href="{{ $step > 1 ? route('provider.create', ['step' => $step - 1]) : route('provider.dashboard') }}">← {{ $step > 1 ? 'Back' : 'Dashboard' }}</a>
-            <button type="submit">{{ $step === 5 ? 'Submit for approval' : 'Continue' }} →</button>
+            <button type="submit">{{ $step === 6 ? 'Submit for approval' : 'Continue' }} →</button>
         </div>
     </form>
     <p class="text-small">Draft saved when you select Continue. Drafts belong to your signed-in session; signing out discards an unfinished draft.</p>
 </section>
 <script type="module" src="{{ asset('js/provider-wizard.mjs') }}"></script>
+<script type="module" src="{{ asset('js/business-details.mjs') }}"></script>
 @endsection

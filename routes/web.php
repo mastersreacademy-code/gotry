@@ -54,8 +54,8 @@ Route::middleware('auth')->group(function (): void {
     });
     Route::middleware('role:provider')->group(function (): void {
         Route::get('/provider', [ProviderActivityController::class, 'index'])->name('provider.dashboard');
-        Route::get('/provider/new/{step?}', [ProviderActivityController::class, 'create'])->where('step', '[1-5]')->block(10, 10)->name('provider.create');
-        Route::post('/provider/new/{step}', [ProviderActivityController::class, 'save'])->where('step', '[1-4]')->block(10, 10)->name('provider.save');
+        Route::get('/provider/new/{step?}', [ProviderActivityController::class, 'create'])->where('step', '[1-6]')->block(10, 10)->name('provider.create');
+        Route::post('/provider/new/{step}', [ProviderActivityController::class, 'save'])->where('step', '[1-5]')->block(10, 10)->name('provider.save');
         Route::post('/provider/submit', [ProviderActivityController::class, 'submit'])->block(10, 10)->name('provider.submit');
         Route::post('/provider/activities/{activity}/offer', [ProviderActivityController::class, 'offer'])->whereNumber('activity')->middleware('throttle:interest-writes')->block(10, 10)->name('provider.offer');
         Route::post('/provider/activities/{activity}/reschedule', [ProviderActivityController::class, 'reschedule'])->whereNumber('activity')->middleware('throttle:interest-writes')->block(10, 10)->name('provider.reschedule');

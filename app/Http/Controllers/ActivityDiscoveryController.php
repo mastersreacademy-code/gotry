@@ -49,6 +49,8 @@ class ActivityDiscoveryController
             $sessions[$number] = ['start' => $start, ...$interests->availability($activity, session: $number)];
         }
         return view('activities.show', ['title' => $activity->title, 'category' => $activity->category,
+            'hasDraftLogo' => !empty($activity->details['branding']['logo']) && \Illuminate\Support\Facades\Storage::disk('local')->exists($activity->details['branding']['logo']),
+            'hasDraftBackground' => !empty($activity->details['branding']['background']) && \Illuminate\Support\Facades\Storage::disk('local')->exists($activity->details['branding']['background']),
             'children' => $request->user()?->role === 'parent'
                 ? \App\Models\Child::where('parent_id', $request->user()->id)->orderBy('first_name')->get()
                 : collect(),

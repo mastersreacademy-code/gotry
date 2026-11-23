@@ -61,10 +61,10 @@ class ParentInterestTest extends TestCase
         $interest = $this->register($parent, $activity);
         $activity->update(['status' => 'proceeding_pending_payments']);
         $this->actingAs($parent)->withSession(['parent_payment_reminder' => true])
-            ->get('/parent')->assertOk()->assertSee('data-payment-reminder', false)->assertSee('Next upcoming trial');
+            ->get('/parent')->assertOk()->assertSee('data-payment-reminder', false)->assertDontSee('Next confirmed activity');
         $this->get('/parent')->assertOk()->assertDontSee('data-payment-reminder', false);
         $this->actingAs($this->user())->withSession(['parent_payment_reminder' => true])
-            ->get('/parent')->assertOk()->assertDontSee('data-payment-reminder', false)->assertDontSee('Next upcoming trial');
+            ->get('/parent')->assertOk()->assertDontSee('data-payment-reminder', false)->assertDontSee('Next confirmed activity');
 
         DB::table('trial_payments')->insert([
             'interest_id' => $interest->id, 'attempt' => (string) Str::uuid(),
@@ -72,10 +72,32 @@ class ParentInterestTest extends TestCase
             'order_id' => 'PAIDORDER', 'capture_id' => 'PAIDCAPTURE', 'paid_at' => now(),
         ]);
         $this->actingAs($parent)->withSession(['parent_payment_reminder' => true])
-            ->get('/parent')->assertOk()->assertDontSee('data-payment-reminder', false)->assertSee('Next upcoming trial');
+            ->get('/parent')->assertOk()->assertDontSee('data-payment-reminder', false)->assertSee('Next confirmed activity');
         $activity->update(['status' => 'cancelled_by_admin']);
         $this->withSession(['parent_payment_reminder' => true])->get('/parent')
-            ->assertOk()->assertDontSee('data-payment-reminder', false)->assertDontSee('Next upcoming trial');
+            ->assertOk()->assertDontSee('data-payment-reminder', false)->assertDontSee('Next confirmed activity');
+    }
+
+    public function test_child_filter_is_scoped_to_parent_and_preserves_other_registrations(): void
+    {
+        $parent = $this->user();
+        $activity = $this->activity();
+        $first = \App\Models\Child::create([
+            'parent_id' => $parent->id, 'first_name' => 'First', 'surname' => 'Child',
+            'age' => 8, 'registration_key' => hash('sha256', 'first child'),
+        ]);
+        $second = \App\Models\Child::create([
+            'parent_id' => $parent->id, 'first_name' => 'Second', 'surname' => 'Child',
+            'age' => 9, 'registration_key' => hash('sha256', 'second child'),
+        ]);
+        $input = ['expected_activity_version' => $activity->version, 'interest_terms' => 1];
+        $this->actingAs($parent)->post('/activities/'.$activity->id.'/interest', [...$input, 'child_id' => $first->id])->assertRedirect();
+        $this->post('/activities/'.$activity->id.'/interest', [...$input, 'child_id' => $second->id])->assertRedirect();
+        $this->get('/parent?child='.$first->id)->assertOk()->assertViewHas('interests', function ($interests) use ($first) {
+            return $interests->count() === 1 && $interests->first()->child_id === $first->id;
+        });
+        $this->actingAs($this->user())->get('/parent?child='.$first->id)->assertNotFound();
+        $this->assertDatabaseCount('interests', 2);
     }
 
     public function test_parent_can_save_children_select_them_and_cannot_use_another_accounts_child(): void

@@ -8,7 +8,7 @@ use Illuminate\Validation\Rule;
 
 class ActivityDraft
 {
-    public const STEPS = [1 => 'Business', 2 => 'Activity', 3 => 'Trial Lesson', 4 => 'Usual Lessons', 5 => 'Review'];
+    public const STEPS = [1 => 'Business', 2 => 'Activity', 3 => 'Trial Lesson', 4 => 'Usual Lessons', 5 => 'Images', 6 => 'Review'];
     public const CATEGORIES = ['Sports & Fitness', 'Music', 'Dance', 'Arts & Crafts', 'STEM & Coding', 'Drama & Performance', 'Languages', 'Other'];
 
     public function fields(int $step): array
@@ -17,7 +17,7 @@ class ActivityDraft
         return match ($step) {
             1 => [
                 ['business_name', 'Business or organisation name', 'text'],
-                ['abn', 'ABN (optional)', 'text'], ['website', 'Business website (optional)', 'url'],
+                ['abn', 'ABN', 'text'], ['website', 'Business website (optional)', 'text'],
                 ['contact_name', "Contact person's full name", 'text'],
                 ['phone', 'Mobile number', 'tel'], ['contact_email', 'Contact email', 'email'],
             ],
@@ -62,6 +62,22 @@ class ActivityDraft
 
     public function validate(int $step, array $input): array
     {
+        if ($step === 1) {
+            if (is_string($input['abn'] ?? null)) {
+                $input['abn'] = preg_replace('/\s+/', '', $input['abn']);
+            }
+            if (is_string($input['website'] ?? null) && trim($input['website']) !== '') {
+                $website = trim($input['website']);
+                if (! str_contains($website, '://')) {
+                    $host = explode('/', $website)[0];
+                    if (preg_match('/\A(?:[a-z0-9-]+\.[a-z]{2,}|[a-z0-9-]+\.(?:com|net|org)\.au)\z/i', $host)) {
+                        $website = 'www.'.$website;
+                    }
+                    $website = 'https://'.$website;
+                }
+                $input['website'] = $website;
+            }
+        }
         if (is_string($input['extra_trial_times'] ?? null)) {
             $input['extra_trial_times'] = implode("\n", array_map('trim', preg_split('/\R/', trim($input['extra_trial_times']))));
         }
@@ -73,7 +89,7 @@ class ActivityDraft
             1 => [
                 'business_name' => ['required', 'string', 'max:160'], 'contact_name' => ['required', 'string', 'max:100'],
                 'contact_email' => ['required', 'email', 'max:254'], 'phone' => ['required', 'string', 'max:40', 'regex:/^[+()0-9 .-]{6,40}$/'],
-                'website' => ['nullable', 'url:http,https', 'max:500'], 'abn' => ['nullable', 'regex:/^[0-9]{11}$/'],
+                'website' => ['nullable', 'url:http,https', 'max:500'], 'abn' => ['required', 'regex:/^[0-9]{11}$/'],
             ],
             2 => [
                 'activity_name' => ['required', 'string', 'max:160'], 'category' => ['required', Rule::in(self::CATEGORIES)],
